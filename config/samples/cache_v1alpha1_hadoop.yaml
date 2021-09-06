@@ -1,0 +1,7 @@
+apiVersion: cache.dameng.hadoop.com/v1alpha1
+kind: Hadoop
+metadata:
+  name: hadoop-sample
+spec:
+  # Add fields here
+  foo: bar

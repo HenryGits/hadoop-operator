@@ -1,0 +1,24 @@
+# permissions for end users to edit hadoops.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: hadoop-editor-role
+rules:
+- apiGroups:
+  - cache.dameng.hadoop.com
+  resources:
+  - hadoops
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - cache.dameng.hadoop.com
+  resources:
+  - hadoops/status
+  verbs:
+  - get
