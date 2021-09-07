@@ -1,0 +1,34 @@
+{{- if .Values.postInstallCommands }}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "hadoop.fullname" . }}-post-install-cmds
+  labels:
+    app: {{ include "hadoop.name" . }}
+    chart: {{ include "hadoop.chart" . }}
+    release: {{ .Release.Name }}
+    component: post-install-cmds
+  annotations:
+    # This is what defines this resource as a hook. Without this line, the
+    # job is considered part of the release.
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-delete-policy: hook-succeeded
+    helm.sh/hook-weight: "10"
+spec:
+  restartPolicy: OnFailure
+  containers:
+  - name: cmds
+    image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+    imagePullPolicy: {{ .Values.image.pullPolicy | quote }}
+    #command: ["/bin/bash", "-c", "until hdfs dfs -ls / >/dev/null 2>&1 || [ $(( ATTEMPTS++ )) -gt 300 ]; do echo \"$(date) - Waiting for HDFS instance to be ready...\" && sleep 10; done && {{ join " && " .Values.postInstallCommands}}"]
+    command:
+    - "/bin/bash"
+    - "/tmp/hadoop-config/shell.sh"
+    volumeMounts:
+    - name: hadoop-config
+      mountPath: /tmp/hadoop-config
+  volumes:
+  - name: hadoop-config
+    configMap:
+      name: {{ include "hadoop.fullname" . }}
+{{- end }}

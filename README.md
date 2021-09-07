@@ -63,3 +63,8 @@ operator-sdk create api --group hadoop --version v1 --kind Hadoop --resource --c
 3. 执行 `make update-codegen` 即可生成 clientset、informers、listers 代码
 
 
+```
+如果您尝试将 CustomResources 与基于 Kubernetes 1.8 的 client-go 一起使用——有些人可能已经很高兴了，因为他们不小心提供了 master 分支的 k8s.op/apimachinery——你遇到了 CustomResource 类型所做的编译器错误未实现
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+```
