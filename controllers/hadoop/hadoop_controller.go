@@ -14,16 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controllers
+package hadoop
 
 import (
 	"context"
-	"github.com/HenryGits/hadoop-operator/api/hadoop/v1alpha1"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	hadoopv1 "github.com/HenryGits/hadoop-operator/apis/hadoop/v1"
 )
 
 // HadoopReconciler reconciles a Hadoop object
@@ -32,9 +33,9 @@ type HadoopReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-//+kubebuilder:rbac:groups=cache.dameng.hadoop.com,resources=hadoops,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=cache.dameng.hadoop.com,resources=hadoops/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=cache.dameng.hadoop.com,resources=hadoops/finalizers,verbs=update
+//+kubebuilder:rbac:groups=hadoop.dameng.com,resources=hadoops,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=hadoop.dameng.com,resources=hadoops/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=hadoop.dameng.com,resources=hadoops/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -56,6 +57,6 @@ func (r *HadoopReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 // SetupWithManager sets up the controller with the Manager.
 func (r *HadoopReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&v1alpha1.Hadoop{}).
+		For(&hadoopv1.Hadoop{}).
 		Complete(r)
 }

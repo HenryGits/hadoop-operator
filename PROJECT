@@ -1,6 +1,7 @@
-domain: dameng.hadoop.com
+domain: dameng.com
 layout:
 - go.kubebuilder.io/v3
+multigroup: true
 plugins:
   manifests.sdk.operatorframework.io/v2: {}
   scorecard.sdk.operatorframework.io/v2: {}
@@ -11,9 +12,9 @@ resources:
     crdVersion: v1
     namespaced: true
   controller: true
-  domain: dameng.hadoop.com
-  group: cache
+  domain: dameng.com
+  group: hadoop
   kind: Hadoop
-  path: github.com/HenryGits/hadoop-operator/api/v1alpha1
-  version: v1alpha1
+  path: github.com/HenryGits/hadoop-operator/apis/hadoop/v1
+  version: v1
 version: "3"

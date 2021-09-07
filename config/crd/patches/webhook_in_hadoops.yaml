@@ -2,7 +2,7 @@
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  name: hadoops.cache.dameng.hadoop.com
+  name: hadoops.hadoop.dameng.com
 spec:
   conversion:
     strategy: Webhook

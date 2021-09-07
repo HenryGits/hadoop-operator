@@ -1,2 +1,65 @@
 # hadoop-operator
 Hadoop Operator on kubernetes
+
+
+4. 安装 Operator-SDK
+
+[Installation | Operator SDK](https://sdk.operatorframework.io/docs/installation/)
+
+```shell
+export ARCH=$(case $(uname -m) in x86_64) echo -n amd64 ;; aarch64) echo -n arm64 ;; *) echo -n $(uname -m) ;; esac)
+export OS=$(uname | awk '{print tolower($0)}')
+export OPERATOR_SDK_DL_URL=https://github.com/operator-framework/operator-sdk/releases/download/v1.11.0
+curl -LO ${OPERATOR_SDK_DL_URL}/operator-sdk_${OS}_${ARCH}
+chmod +x operator-sdk_${OS}_${ARCH} && mv operator-sdk_${OS}_${ARCH} /usr/local/bin/operator-sdk
+echo 'source <(operator-sdk completion bash)' >>~/.bashrc
+operator-sdk completion bash > /etc/bash_completion.d/operator-sdk
+source <(operator-sdk completion bash)
+
+# 若为x86的linux则可以直接
+curl --proxy http://192.168.116.189:1087 -LO https://github.com/operator-framework/operator-sdk/releases/download/v1.11.0/operator-sdk_linux_amd64
+chmod +x operator-sdk_linux_amd64 && mv operator-sdk_linux_amd64 /usr/local/bin/operator-sdk
+```
+
+- 安装 Kubebuilder
+
+
+
+```shell
+curl --proxy http://192.168.116.189:1087 -L -o kubebuilder https://go.kubebuilder.io/dl/latest/$(go env GOOS)/$(go env GOARCH)
+chmod +x kubebuilder && mv kubebuilder /usr/local/bin/
+echo 'source <(kubebuilder completion bash)' >>~/.bashrc
+kubebuilder completion bash > /etc/bash_completion.d/kubebuilder
+source <(kubebuilder completion bash)
+```
+
+#### 使用说明
+
+1. make generate && make manifests && make
+2. make docker-build && make docker-push
+3. make deploy
+4. kubectl apply -f config/samples/hadoop_v1_hadoop.yaml
+5. kubectl delete -f config/samples/hadoop_v1_hadoop.yaml
+6. make undeploy
+
+#### 项目初始化
+
+```shell
+mkdir -p $GOPATH/src/github.com/HenryGits/hadoop-operator && cd $GOPATH/src/github.com/HenryGits/hadoop-operator
+operator-sdk init --domain dameng.com --repo github.com/HenryGits/hadoop-operator
+operator-sdk edit --multigroup=true
+operator-sdk create api --group hadoop --version v1 --kind Hadoop --resource --controller
+```
+
+#### code-generator 的使用
+[kubernetes/code-generator: Generators for kube-like API types](https://github.com/kubernetes/code-generator)
+
+[Kubernetes Deep Dive: Code Generation for CustomResources](https://cloud.redhat.com/blog/kubernetes-deep-dive-code-generation-customresources)
+
+[万物皆可operator之三，code generator的补充](https://blog.csdn.net/sixinchao_1/article/details/109997736)
+
+1. 执行 `go get k8s.io/code-generator@v0.22.1` 下载 code-generator 到 `$GOPATH/pkg/mod/k8s.io/`
+2. 将项目拷贝到 `$GOPATH/src/github.com/HenryGits/hadoop-operator` 目录下（必须，不能将项目直接放置到 src 目录下）
+3. 执行 `make update-codegen` 即可生成 clientset、informers、listers 代码
+
+
