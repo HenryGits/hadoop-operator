@@ -23,10 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/json"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/third_party/forked/golang/template"
 	"k8s.io/klog/v2"
-	"os"
 	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -44,8 +41,8 @@ const (
 	ReleasePrefix string = "hadoop-"
 )
 
-var HadoopTpl = template.Parser{
-	Directory: os.EnvVar("TEMPLATES_PATH", "/etc/dmcca/templates"),
+var HadoopTpl = tools.Parser{
+	Directory: tools.EnvVar("TEMPLATES_PATH", "/etc/operator/templates"),
 	Pattern:   "\\.gotmpl$",
 }
 
@@ -246,7 +243,7 @@ func (r *HadoopReconciler) generateRuntimeObjects(hadoop *hadoopv1.Hadoop) (runt
 		return runtimeObjects, err
 	}
 	klog.V(8).Infof("template: %s", templates)
-	return kubernetes.ParseYaml(templates)
+	return tools.ParseYaml(templates)
 }
 
 func setSpecAnnotation(object *unstructured.Unstructured) (*unstructured.Unstructured, error) {

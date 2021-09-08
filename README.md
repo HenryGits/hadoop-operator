@@ -68,3 +68,9 @@ operator-sdk create api --group hadoop --version v1 --kind Hadoop --resource --c
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 ```
+
+
+```text
+make deploy
+make undeploy
+```
