@@ -2,6 +2,13 @@
 Hadoop Operator on kubernetes
 
 
+3. netrc 文件
+
+   根据官网文档，设置git私有仓库用户名密码，防止 Docker 镜像编译的时候需要手动输入用户名密码
+
+   [Frequently Asked Questions (FAQ) - The Go Programming Language](https://golang.org/doc/faq#git_https)
+
+
 4. 安装 Operator-SDK
 
 [Installation | Operator SDK](https://sdk.operatorframework.io/docs/installation/)
@@ -20,27 +27,6 @@ source <(operator-sdk completion bash)
 curl --proxy http://192.168.116.189:1087 -LO https://github.com/operator-framework/operator-sdk/releases/download/v1.11.0/operator-sdk_linux_amd64
 chmod +x operator-sdk_linux_amd64 && mv operator-sdk_linux_amd64 /usr/local/bin/operator-sdk
 ```
-
-- 安装 Kubebuilder
-
-
-
-```shell
-curl --proxy http://192.168.116.189:1087 -L -o kubebuilder https://go.kubebuilder.io/dl/latest/$(go env GOOS)/$(go env GOARCH)
-chmod +x kubebuilder && mv kubebuilder /usr/local/bin/
-echo 'source <(kubebuilder completion bash)' >>~/.bashrc
-kubebuilder completion bash > /etc/bash_completion.d/kubebuilder
-source <(kubebuilder completion bash)
-```
-
-#### 使用说明
-
-1. make generate && make manifests && make
-2. make docker-build && make docker-push
-3. make deploy
-4. kubectl apply -f config/samples/hadoop_v1_hadoop.yaml
-5. kubectl delete -f config/samples/hadoop_v1_hadoop.yaml
-6. make undeploy
 
 #### 项目初始化
 
@@ -62,15 +48,27 @@ operator-sdk create api --group hadoop --version v1 --kind Hadoop --resource --c
 2. 将项目拷贝到 `$GOPATH/src/github.com/HenryGits/hadoop-operator` 目录下（必须，不能将项目直接放置到 src 目录下）
 3. 执行 `make update-codegen` 即可生成 clientset、informers、listers 代码
 
+- 5、安装 Kubebuilder
+
+```shell
+curl --proxy http://192.168.116.189:1087 -L -o kubebuilder https://go.kubebuilder.io/dl/latest/$(go env GOOS)/$(go env GOARCH)
+chmod +x kubebuilder && mv kubebuilder /usr/local/bin/
+echo 'source <(kubebuilder completion bash)' >>~/.bashrc
+kubebuilder completion bash > /etc/bash_completion.d/kubebuilder
+source <(kubebuilder completion bash)
+```
+
+#### 使用说明
+
+1. make generate && make manifests && make
+2. make docker-build && make docker-push
+3. make deploy
+4. kubectl apply -f config/samples/hadoop_v1_hadoop.yaml
+5. kubectl delete -f config/samples/hadoop_v1_hadoop.yaml
+6. make undeploy
 
 ```
 如果您尝试将 CustomResources 与基于 Kubernetes 1.8 的 client-go 一起使用——有些人可能已经很高兴了，因为他们不小心提供了 master 分支的 k8s.op/apimachinery——你遇到了 CustomResource 类型所做的编译器错误未实现
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-```
-
-
-```text
-make deploy
-make undeploy
 ```

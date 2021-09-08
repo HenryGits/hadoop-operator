@@ -37,8 +37,41 @@ type HadoopSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of Hadoop. Edit hadoop_types.go to remove/update
-	Persistence Persistence `json:"foo,omitempty"`
+	// ID is the id of the hadoop release
+	// +optional
+	ID string `json:"id"`
+	// Title is the title of the hadoop release
+	// +optional
+	Title string `json:"title,omitempty"`
+	// Describe is the description of the hadoop release
+	// +optional
+	Describe string `json:"describe,omitempty"`
+	// Image is the base hadoop image to use for all components.
+	// +optional
+	// +kubebuilder:default:={repository: "jasonchrion/hadoop", tag: "3.2.2-nolib", pullPolicy: "IfNotPresent"}
+	Image Image `json:"image,omitempty"`
+	// HadoopVersion is the version of the hadoop libraries being used in the image.
+	// +optional
+	// +kubebuilder:default="3.2.2"
+	HadoopVersion string `json:"hadoopVersion,omitempty"`
+	// AntiAffinity Select antiAffinity as either hard or soft, default is soft
+	// +optional
+	// +kubebuilder:validation:Enum={soft,hard}
+	// +kubebuilder:default="soft"
+	AntiAffinity AntiAffinity `json:"antiAffinity,omitempty"`
+	// Hdfs is hadoop hdfs components include NameNode, DataNode, WebHdfs
+	// +optional
+	Hdfs *Hdfs `json:"hdfs,omitempty"`
+	// Yarn is hadoop yarn components include ResourceManager, NodeManager
+	// +optional
+	Yarn *Yarn `json:"yarn,omitempty"`
+	// Persistence is persistent volume for Hadoop components
+	// +optional
+	Persistence *Persistence `json:"persistence,omitempty"`
+	// PostInstallCommands is the hdfs commands to be run after the installation
+	// +optional
+	// +kubebuilder:default={}
+	PostInstallCommands []string `json:"postInstallCommands,omitempty"`
 }
 
 // HadoopStatus defines the observed state of Hadoop
