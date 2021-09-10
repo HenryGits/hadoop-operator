@@ -7,11 +7,8 @@ package tools
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"github.com/Masterminds/sprig/v3"
-	structs "github.com/fatih/structs"
-	"gopkg.in/yaml.v2"
 	"k8s.io/klog/v2"
 	"strings"
 	"text/template"
@@ -64,78 +61,6 @@ func (p *Parser) Include(name string, parameters interface{}) (result string) {
 	return result
 }
 
-var defaultParser = &Parser{EnvVar("GT_TEMPLATE_PATH", "/etc/dmcca/templates"), "\\.gotmpl$"}
-
-// ParseTemplate 解析文件模版函数
-func ParseTemplate(name string, parameters interface{}) (string, error) {
-	return defaultParser.ParseTemplate(name, parameters)
-}
-
-// ParseString 解析字符串模版函数
-func ParseString(tmpl string, parameters interface{}) (string, error) {
-	return defaultParser.ParseString(tmpl, parameters)
-}
-
-func (p *Parser) buildFunctionMap() template.FuncMap {
-	return template.FuncMap{
-		"toYaml":  MustToYaml,
-		"toJson":  ToJson,
-		"snipe":   Snipe,
-		"hitch":   Hitch,
-		"include": p.Include,
-	}
-}
-
-// MustToYaml 将结构体转化为Yaml格式的字符串
-func MustToYaml(object interface{}) string {
-	bytes, err := yaml.Marshal(object)
-	if err != nil {
-		klog.ErrorS(err, "Failed to marshal struct")
-		return ""
-	}
-	klog.V(8).Infoln(string(bytes), "method", "toYaml")
-	return string(bytes)
-}
-
-// ToJson 将结构体转化为JSON格式的字符串
-func ToJson(object interface{}) string {
-	bytes, err := json.Marshal(object)
-	if err != nil {
-		klog.ErrorS(err, "Failed to marshal struct")
-		return ""
-	}
-	klog.V(8).Infoln(string(bytes), "method", "toJson")
-	return string(bytes)
-}
-
-// Snipe 根据路径获取结构体字段值
-func Snipe(object interface{}, path string) interface{} {
-	data, found, err := NestedField(structs.Map(object), strings.Split(path, ".")...)
-	if err != nil {
-		klog.ErrorS(err, "snipe error")
-		return nil
-	}
-	if found {
-		return data
-	}
-	return nil
-}
-
-// Hitch 根据路径设置结构体字段值
-func Hitch(object interface{}, path string, value interface{}) (result map[string]interface{}) {
-	if object == nil {
-		result = make(map[string]interface{})
-	} else {
-		result = structs.Map(object)
-	}
-	if i := strings.Index(path, "."); i == -1 {
-		result[path] = value
-	} else {
-		result[path[:i]] = Hitch(nil, path[i+1:], value)
-	}
-	return result
-}
-
 // NestedField returns a reference to a nested field.
 // Returns false if value is not found and an error if unable
 // to traverse obj.
@@ -164,4 +89,17 @@ func NestedField(obj map[string]interface{}, fields ...string) (interface{}, boo
 
 func jsonPath(fields []string) string {
 	return "." + strings.Join(fields, ".")
+}
+
+// 初始化需渲染的默认模板路径
+var defaultParser = &Parser{EnvVar("GT_TEMPLATE_PATH", "/etc/operator/templates"), "\\.gotmpl$"}
+
+// ParseTemplate 解析文件模版函数
+func ParseTemplate(name string, parameters interface{}) (string, error) {
+	return defaultParser.ParseTemplate(name, parameters)
+}
+
+// ParseString 解析字符串模版函数
+func ParseString(tmpl string, parameters interface{}) (string, error) {
+	return defaultParser.ParseString(tmpl, parameters)
 }

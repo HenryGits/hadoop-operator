@@ -1,0 +1,385 @@
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.6.1
+  creationTimestamp: null
+  name: hadoops.hadoop.dameng.com
+spec:
+  group: hadoop.dameng.com
+  names:
+    kind: Hadoop
+    listKind: HadoopList
+    plural: hadoops
+    singular: hadoop
+  scope: Namespaced
+  versions:
+  - name: v1
+    schema:
+      openAPIV3Schema:
+        description: Hadoop is the Schema for the hadoops API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: HadoopSpec defines the desired state of Hadoop
+            properties:
+              antiAffinity:
+                default: soft
+                description: AntiAffinity Select antiAffinity as either hard or soft,
+                  default is soft
+                enum:
+                - soft
+                - hard
+                type: string
+              describe:
+                description: Describe is the description of the hadoop release
+                type: string
+              hadoopVersion:
+                default: 3.2.2
+                description: HadoopVersion is the version of the hadoop libraries
+                  being used in the image.
+                type: string
+              hdfs:
+                description: Hdfs is hadoop hdfs components include NameNode, DataNode,
+                  WebHdfs
+                properties:
+                  dataNode:
+                    properties:
+                      pdbMinAvailable:
+                        default: 1
+                        description: PdbMinAvailable is the minimum available number
+                          of PodDisruptionBudget for Hadoop component
+                        format: int32
+                        minimum: 1
+                        type: integer
+                      replicas:
+                        default: 3
+                        description: Replicas is the pod number of Hadoop component.
+                        format: int32
+                        type: integer
+                      resources:
+                        default:
+                          limits:
+                            cpu: 500m
+                            memory: 1Gi
+                          requests:
+                            cpu: 100m
+                            memory: 256Mi
+                        description: Resources is the CPU and memory resource (requests
+                          and limits) allocated to each Hadoop component pod. This
+                          should be tuned to fit your workload.
+                        properties:
+                          limits:
+                            description: 'Limits describes the maximum amount of compute
+                              resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                            properties:
+                              cpu:
+                                type: string
+                              memory:
+                                type: string
+                            type: object
+                          requests:
+                            description: 'Requests describes the minimum amount of
+                              compute resources required. If Requests is omitted for
+                              a container, it defaults to Limits if that is explicitly
+                              specified, otherwise to an implementation-defined value.
+                              More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                            properties:
+                              cpu:
+                                type: string
+                              memory:
+                                type: string
+                            type: object
+                        type: object
+                    type: object
+                  nameNode:
+                    properties:
+                      pdbMinAvailable:
+                        default: 1
+                        description: PdbMinAvailable is the minimum available number
+                          of PodDisruptionBudget for Hadoop component
+                        format: int32
+                        minimum: 1
+                        type: integer
+                      resources:
+                        default:
+                          limits:
+                            cpu: 500m
+                            memory: 1Gi
+                          requests:
+                            cpu: 100m
+                            memory: 256Mi
+                        description: Resources is the CPU and memory resource (requests
+                          and limits) allocated to each Hadoop component pod. This
+                          should be tuned to fit your workload.
+                        properties:
+                          limits:
+                            description: 'Limits describes the maximum amount of compute
+                              resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                            properties:
+                              cpu:
+                                type: string
+                              memory:
+                                type: string
+                            type: object
+                          requests:
+                            description: 'Requests describes the minimum amount of
+                              compute resources required. If Requests is omitted for
+                              a container, it defaults to Limits if that is explicitly
+                              specified, otherwise to an implementation-defined value.
+                              More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                            properties:
+                              cpu:
+                                type: string
+                              memory:
+                                type: string
+                            type: object
+                        type: object
+                    type: object
+                  webHdfs:
+                    properties:
+                      enabled:
+                        default: true
+                        description: Enabled is whether to enable WebHDFS REST API
+                          or not
+                        enum:
+                        - true
+                        - false
+                        type: boolean
+                    type: object
+                type: object
+              id:
+                description: ID is the id of the hadoop release
+                type: string
+              image:
+                default:
+                  pullPolicy: IfNotPresent
+                  repository: jasonchrion/hadoop
+                  tag: 3.2.2-nolib
+                description: Image is the base hadoop image to use for all components.
+                properties:
+                  pullPolicy:
+                    default: IfNotPresent
+                    description: PullPolicy is the pull policy for the images
+                    enum:
+                    - Always
+                    - Never
+                    - IfNotPresent
+                    type: string
+                  repository:
+                    default: jasonchrion/hadoop
+                    description: Repository is Hadoop image repository
+                    type: string
+                  tag:
+                    default: 3.2.2-nolib
+                    description: Tag is the Hadoop image tag
+                    type: string
+                type: object
+              persistence:
+                description: Persistence is persistent volume for Hadoop components
+                properties:
+                  dataNode:
+                    properties:
+                      accessMode:
+                        default: ReadWriteOnce
+                        description: 'AccessMode contains the desired access modes
+                          the volume should have. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1'
+                        enum:
+                        - ReadWriteOnce
+                        - ReadOnlyMany
+                        - ReadWriteMany
+                        type: string
+                      enabled:
+                        default: false
+                        description: Enabled is whether to enable Hadoop component
+                          persistence or not
+                        enum:
+                        - true
+                        - false
+                        type: boolean
+                      size:
+                        default: 200Gi
+                        description: Size is the size of the volume
+                        type: string
+                      storageClass:
+                        default: '-'
+                        description: 'StorageClass is the name of the StorageClass
+                          required by the claim. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1'
+                        type: string
+                    type: object
+                  nameNode:
+                    properties:
+                      accessMode:
+                        default: ReadWriteOnce
+                        description: 'AccessMode contains the desired access modes
+                          the volume should have. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1'
+                        enum:
+                        - ReadWriteOnce
+                        - ReadOnlyMany
+                        - ReadWriteMany
+                        type: string
+                      enabled:
+                        default: false
+                        description: Enabled is whether to enable Hadoop component
+                          persistence or not
+                        enum:
+                        - true
+                        - false
+                        type: boolean
+                      size:
+                        default: 50Gi
+                        description: Size is the size of the volume
+                        type: string
+                      storageClass:
+                        default: '-'
+                        description: 'StorageClass is the name of the StorageClass
+                          required by the claim. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1'
+                        type: string
+                    type: object
+                type: object
+              postInstallCommands:
+                description: PostInstallCommands is the hdfs commands to be run after
+                  the installation
+                items:
+                  type: string
+                type: array
+              title:
+                description: Title is the title of the hadoop release
+                type: string
+              yarn:
+                description: Yarn is hadoop yarn components include ResourceManager,
+                  NodeManager
+                properties:
+                  nodeManager:
+                    properties:
+                      parallelCreate:
+                        default: true
+                        description: ParallelCreate is whether to create all nodeManager
+                          statefulset pods in parallel or not (K8S 1.7+)
+                        enum:
+                        - true
+                        - false
+                        type: boolean
+                      pdbMinAvailable:
+                        default: 1
+                        description: PdbMinAvailable is the minimum available number
+                          of PodDisruptionBudget for Hadoop component
+                        format: int32
+                        minimum: 1
+                        type: integer
+                      replicas:
+                        default: 3
+                        description: Replicas is the pod number of Hadoop component.
+                        format: int32
+                        type: integer
+                      resources:
+                        default:
+                          limits:
+                            cpu: 500m
+                            memory: 1Gi
+                          requests:
+                            cpu: 100m
+                            memory: 256Mi
+                        description: Resources is the CPU and memory resource (requests
+                          and limits) allocated to each Hadoop component pod. This
+                          should be tuned to fit your workload.
+                        properties:
+                          limits:
+                            description: 'Limits describes the maximum amount of compute
+                              resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                            properties:
+                              cpu:
+                                type: string
+                              memory:
+                                type: string
+                            type: object
+                          requests:
+                            description: 'Requests describes the minimum amount of
+                              compute resources required. If Requests is omitted for
+                              a container, it defaults to Limits if that is explicitly
+                              specified, otherwise to an implementation-defined value.
+                              More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                            properties:
+                              cpu:
+                                type: string
+                              memory:
+                                type: string
+                            type: object
+                        type: object
+                    type: object
+                  resourceManager:
+                    properties:
+                      pdbMinAvailable:
+                        default: 1
+                        description: PdbMinAvailable is the minimum available number
+                          of PodDisruptionBudget for Hadoop component
+                        format: int32
+                        minimum: 1
+                        type: integer
+                      resources:
+                        default:
+                          limits:
+                            cpu: 500m
+                            memory: 1Gi
+                          requests:
+                            cpu: 100m
+                            memory: 256Mi
+                        description: Resources is the CPU and memory resource (requests
+                          and limits) allocated to each Hadoop component pod. This
+                          should be tuned to fit your workload.
+                        properties:
+                          limits:
+                            description: 'Limits describes the maximum amount of compute
+                              resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                            properties:
+                              cpu:
+                                type: string
+                              memory:
+                                type: string
+                            type: object
+                          requests:
+                            description: 'Requests describes the minimum amount of
+                              compute resources required. If Requests is omitted for
+                              a container, it defaults to Limits if that is explicitly
+                              specified, otherwise to an implementation-defined value.
+                              More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                            properties:
+                              cpu:
+                                type: string
+                              memory:
+                                type: string
+                            type: object
+                        type: object
+                    type: object
+                type: object
+            type: object
+          status:
+            description: HadoopStatus defines the observed state of Hadoop
+            properties:
+              phase:
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

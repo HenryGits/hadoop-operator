@@ -29,6 +29,20 @@ const (
 	Deleting    Phase = "Deleting"
 )
 
+//+genclient
+//+k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+//+kubebuilder:object:root=true
+//+kubebuilder:subresource:status
+
+// Hadoop is the Schema for the hadoops API
+type Hadoop struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	Spec   HadoopSpec   `json:"spec,omitempty"`
+	Status HadoopStatus `json:"status,omitempty"`
+}
+
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
@@ -80,20 +94,6 @@ type HadoopStatus struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	Phase Phase `json:"phase,omitempty"`
-}
-
-//+genclient
-//+k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
-
-// Hadoop is the Schema for the hadoops API
-type Hadoop struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-
-	Spec   HadoopSpec   `json:"spec,omitempty"`
-	Status HadoopStatus `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true

@@ -202,6 +202,5 @@ catalog-build: opm ## Build a catalog image.
 catalog-push: ## Push a catalog image.
 	$(MAKE) docker-push IMG=$(CATALOG_IMG)
 
-
 update-codegen:
-	@./hack/update-codegen.sh
+	@./hack/update-codegen.sh 

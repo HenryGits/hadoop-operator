@@ -44,11 +44,17 @@ operator-sdk create api --group hadoop --version v1 --kind Hadoop --resource --c
 
 [万物皆可operator之三，code generator的补充](https://blog.csdn.net/sixinchao_1/article/details/109997736)
 
+```shell
+echo -e "
+update-codegen:
+  @./hack/update-codegen.sh " >> Makefile
+```
 1. 执行 `go get k8s.io/code-generator@v0.22.1` 下载 code-generator 到 `$GOPATH/pkg/mod/k8s.io/`
 2. 将项目拷贝到 `$GOPATH/src/github.com/HenryGits/hadoop-operator` 目录下（必须，不能将项目直接放置到 src 目录下）
 3. 执行 `make update-codegen` 即可生成 clientset、informers、listers 代码
 
-- 5、安装 Kubebuilder
+
+5、安装 Kubebuilder
 
 ```shell
 curl --proxy http://192.168.116.189:1087 -L -o kubebuilder https://go.kubebuilder.io/dl/latest/$(go env GOOS)/$(go env GOARCH)

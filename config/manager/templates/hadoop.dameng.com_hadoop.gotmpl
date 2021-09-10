@@ -1,0 +1,999 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hadoop-{{ $.ObjectMeta.Name }}
+  labels:
+    app: hadoop
+    chart: hadoop-1.1.4
+    release: hadoop-{{ $.ObjectMeta.Name }}
+    operator.dameng.com/id: {{ $.Spec.ID | quote }}
+data:
+  bootstrap.sh: |
+    #!/bin/bash
+
+    : ${HADOOP_HOME:=/usr/local/hadoop}
+
+    . $HADOOP_HOME/etc/hadoop/hadoop-env.sh
+
+    # Directory to find config artifacts
+    CONFIG_DIR="/tmp/hadoop-config"
+
+    # Copy config files from volume mount
+    for f in workers core-site.xml hdfs-site.xml mapred-site.xml yarn-site.xml; do
+      if [[ -e ${CONFIG_DIR}/$f ]]; then
+        cp -f ${CONFIG_DIR}/$f $HADOOP_HOME/etc/hadoop/$f
+      else
+        echo "ERROR: Could not find $f in $CONFIG_DIR"
+        exit 1
+      fi
+    done
+
+    # installing libraries if any - (resource urls added comma separated to the ACP system variable)
+    cd $HADOOP_HOME/share/hadoop/common ; for cp in ${ACP//,/ }; do  echo == $cp; curl -LO $cp ; done; cd -
+
+    if [[ "${HOSTNAME}" =~ "hdfs-nn" ]]; then
+      mkdir -p /root/hdfs/namenode
+      $HADOOP_HOME/bin/hdfs namenode -format -force -nonInteractive
+      $HADOOP_HOME/bin/hdfs namenode
+    fi
+
+    if [[ "${HOSTNAME}" =~ "hdfs-dn" ]]; then
+      mkdir -p /root/hdfs/datanode
+
+      #  wait up to 30 seconds for namenode
+      (while [[ $count -lt 15 && -z `curl -sf http://hadoop-{{ $.ObjectMeta.Name }}-hdfs-nn:9870` ]]; do ((count=count+1)) ; echo "Waiting for hadoop-{{ $.ObjectMeta.Name }}-hdfs-nn" ; sleep 5; done && [[ $count -lt 15 ]])
+      [[ $? -ne 0 ]] && echo "Timeout waiting for hdfs-nn, exiting." && exit 1
+      $HADOOP_HOME/bin/hdfs datanode
+    fi
+
+    if [[ "${HOSTNAME}" =~ "yarn-rm" ]]; then
+      cp ${CONFIG_DIR}/start-yarn-rm.sh $HADOOP_HOME/sbin/
+      cd $HADOOP_HOME/sbin
+      chmod +x start-yarn-rm.sh
+      ./start-yarn-rm.sh
+    fi
+
+    if [[ "${HOSTNAME}" =~ "yarn-nm" ]]; then
+      sed -i '/<\/configuration>/d' $HADOOP_HOME/etc/hadoop/yarn-site.xml
+      cat >> $HADOOP_HOME/etc/hadoop/yarn-site.xml <<- EOM
+      <property>
+        <name>yarn.nodemanager.resource.memory-mb</name>
+        <value>${MY_MEM_LIMIT:-2048}</value>
+      </property>
+
+      <property>
+        <name>yarn.nodemanager.resource.cpu-vcores</name>
+        <value>${MY_CPU_LIMIT:-2}</value>
+      </property>
+    EOM
+      echo '</configuration>' >> $HADOOP_HOME/etc/hadoop/yarn-site.xml
+      cp ${CONFIG_DIR}/start-yarn-nm.sh $HADOOP_HOME/sbin/
+      cd $HADOOP_HOME/sbin
+      chmod +x start-yarn-nm.sh
+
+      #  wait up to 30 seconds for resourcemanager
+      (while [[ $count -lt 15 && -z `curl -sf http://hadoop-{{ $.ObjectMeta.Name }}-yarn-rm:8088/ws/v1/cluster/info` ]]; do ((count=count+1)) ; echo "Waiting for hadoop-{{ $.ObjectMeta.Name }}-yarn-rm" ; sleep 2; done && [[ $count -lt 15 ]])
+      [[ $? -ne 0 ]] && echo "Timeout waiting for yarn-rm, exiting." && exit 1
+
+      ./start-yarn-nm.sh
+    fi
+
+    if [[ $1 == "-d" ]]; then
+      until find ${HADOOP_HOME}/logs -mmin -1 | egrep -q '.*'; echo "`date`: Waiting for logs..." ; do sleep 2 ; done
+      tail -F ${HADOOP_HOME}/logs/* &
+      while true; do sleep 1000; done
+    fi
+
+    if [[ $1 == "-bash" ]]; then
+      /bin/bash
+    fi
+
+  shell.sh: |
+    #!/bin/bash
+
+    : ${HADOOP_HOME:=/usr/local/hadoop}
+
+    . $HADOOP_HOME/etc/hadoop/hadoop-env.sh
+
+    # Directory to find config artifacts
+    CONFIG_DIR="/tmp/hadoop-config"
+
+    # Copy config files from volume mount
+    for f in workers core-site.xml hdfs-site.xml mapred-site.xml yarn-site.xml; do
+      if [[ -e ${CONFIG_DIR}/$f ]]; then
+        cp -f ${CONFIG_DIR}/$f $HADOOP_HOME/etc/hadoop/$f
+      else
+        echo "ERROR: Could not find $f in $CONFIG_DIR"
+        exit 1
+      fi
+    done
+
+    {{ $cmdlength := len $.Spec.PostInstallCommands -}}
+    {{- if gt $cmdlength 0 -}}
+    if [[ "${HOSTNAME}" =~ "post-install-cmds" ]]; then
+      until hdfs dfs -ls / >/dev/null 2>&1 || [ $(( ATTEMPTS++ )) -gt 300 ]; do echo "$(date) - Waiting for HDFS instance to be ready..." && sleep 10; done && {{ join " && " $.Spec.PostInstallCommands }}
+    fi
+    {{- end }}
+
+    if [[ $1 == "-d" ]]; then
+      while true; do sleep 1000; done
+    fi
+
+    if [[ $1 == "-bash" ]]; then
+      /bin/bash
+    fi
+
+  core-site.xml: |
+    <?xml version="1.0"?>
+    <?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+    <configuration>
+      <property>
+        <name>fs.defaultFS</name>
+        <value>hdfs://hadoop-{{ $.ObjectMeta.Name }}-hdfs-nn:9000/</value>
+        <description>NameNode URI</description>
+      </property>
+    </configuration>
+
+  hdfs-site.xml: |
+    <?xml version="1.0"?>
+    <?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+    <configuration>
+
+{{- if $.Spec.Hdfs.WebHdfs.Enabled -}}
+      <property>
+          <name>dfs.webhdfs.enabled</name>
+          <value>true</value>
+      </property>
+{{- end -}}
+
+      <property>
+        <name>dfs.datanode.use.datanode.hostname</name>
+        <value>false</value>
+      </property>
+
+      <property>
+        <name>dfs.client.use.datanode.hostname</name>
+        <value>false</value>
+      </property>
+
+      <property>
+        <name>dfs.replication</name>
+          <value>3</value>
+      </property>
+
+      <property>
+        <name>dfs.datanode.data.dir</name>
+        <value>file:///root/hdfs/datanode</value>
+        <description>DataNode directory</description>
+      </property>
+
+      <property>
+        <name>dfs.namenode.name.dir</name>
+        <value>file:///root/hdfs/namenode</value>
+        <description>NameNode directory for namespace and transaction logs storage.</description>
+      </property>
+
+      <property>
+        <name>dfs.namenode.datanode.registration.ip-hostname-check</name>
+        <value>false</value>
+      </property>
+
+      <!-- Bind to all interfaces -->
+      <property>
+        <name>dfs.namenode.rpc-bind-host</name>
+        <value>0.0.0.0</value>
+      </property>
+      <property>
+        <name>dfs.namenode.servicerpc-bind-host</name>
+        <value>0.0.0.0</value>
+      </property>
+      <!-- /Bind to all interfaces -->
+
+    </configuration>
+
+  mapred-site.xml: |
+    <?xml version="1.0"?>
+    <?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+
+    <configuration>
+      <property>
+        <name>mapreduce.framework.name</name>
+        <value>yarn</value>
+      </property>
+      <property>
+        <name>mapreduce.jobhistory.address</name>
+        <value>hadoop-{{ $.ObjectMeta.Name }}-yarn-rm-0.hadoop-{{ $.ObjectMeta.Name }}-yarn-rm.{{ $.ObjectMeta.Namespace }}.svc.cluster.local:10020</value>
+      </property>
+      <property>
+        <name>mapreduce.jobhistory.webapp.address</name>
+        <value>hadoop-{{ $.ObjectMeta.Name }}-yarn-rm-0.hadoop-{{ $.ObjectMeta.Name }}-yarn-rm.{{ $.ObjectMeta.Namespace }}.svc.cluster.local:19888</value>
+      </property>
+    </configuration>
+
+  workers: |
+    {{- $count := $.Spec.Hdfs.DataNode.Replicas | int -}}
+    {{- range $i, $e := until $count }}
+    hadoop-{{ $.ObjectMeta.Name }}-hdfs-dn-{{ $i }}.hadoop-{{ $.ObjectMeta.Name }}-hdfs-dn.{{ $.ObjectMeta.Namespace }}.svc.cluster.local
+    {{- end }}
+
+  start-yarn-nm.sh: |
+    #!/usr/bin/env bash
+
+    # Licensed to the Apache Software Foundation (ASF) under one or more
+    # contributor license agreements.  See the NOTICE file distributed with
+    # this work for additional information regarding copyright ownership.
+    # The ASF licenses this file to You under the Apache License, Version 2.0
+    # (the "License"); you may not use this file except in compliance with
+    # the License.  You may obtain a copy of the License at
+    #
+    #     http://www.apache.org/licenses/LICENSE-2.0
+    #
+    # Unless required by applicable law or agreed to in writing, software
+    # distributed under the License is distributed on an "AS IS" BASIS,
+    # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    # See the License for the specific language governing permissions and
+    # limitations under the License.
+
+
+    # Start all yarn daemons.  Run this on master node.
+
+    echo "starting yarn daemons"
+
+    bin=`dirname "${BASH_SOURCE-$0}"`
+    bin=`cd "$bin"; pwd`
+
+    DEFAULT_LIBEXEC_DIR="$bin"/../libexec
+    HADOOP_LIBEXEC_DIR=${HADOOP_LIBEXEC_DIR:-$DEFAULT_LIBEXEC_DIR}
+    . $HADOOP_LIBEXEC_DIR/yarn-config.sh
+
+    # start resourceManager
+    # "$bin"/yarn-daemon.sh --config $YARN_CONF_DIR  start resourcemanager
+    # start nodeManager
+    "$bin"/yarn-daemon.sh --config $YARN_CONF_DIR  start nodemanager
+    # start proxyserver
+    #"$bin"/yarn-daemon.sh --config $YARN_CONF_DIR  start proxyserver
+
+  start-yarn-rm.sh: |
+    #!/usr/bin/env bash
+
+    # Licensed to the Apache Software Foundation (ASF) under one or more
+    # contributor license agreements.  See the NOTICE file distributed with
+    # this work for additional information regarding copyright ownership.
+    # The ASF licenses this file to You under the Apache License, Version 2.0
+    # (the "License"); you may not use this file except in compliance with
+    # the License.  You may obtain a copy of the License at
+    #
+    #     http://www.apache.org/licenses/LICENSE-2.0
+    #
+    # Unless required by applicable law or agreed to in writing, software
+    # distributed under the License is distributed on an "AS IS" BASIS,
+    # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    # See the License for the specific language governing permissions and
+    # limitations under the License.
+
+
+    # Start all yarn daemons.  Run this on master node.
+
+    echo "starting yarn daemons"
+
+    bin=`dirname "${BASH_SOURCE-$0}"`
+    bin=`cd "$bin"; pwd`
+
+    DEFAULT_LIBEXEC_DIR="$bin"/../libexec
+    HADOOP_LIBEXEC_DIR=${HADOOP_LIBEXEC_DIR:-$DEFAULT_LIBEXEC_DIR}
+    . $HADOOP_LIBEXEC_DIR/yarn-config.sh
+
+    # start resourceManager
+    "$bin"/yarn-daemon.sh --config $YARN_CONF_DIR  start resourcemanager
+    # start nodeManager
+    # "$bin"/yarn-daemons.sh --config $YARN_CONF_DIR  start nodemanager
+    # start proxyserver
+    "$bin"/yarn-daemon.sh --config $YARN_CONF_DIR  start proxyserver
+
+  yarn-site.xml: |
+    <?xml version="1.0"?>
+    <?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+
+    <configuration>
+      <property>
+        <name>yarn.resourcemanager.hostname</name>
+        <value>hadoop-{{ $.ObjectMeta.Name }}-yarn-rm</value>
+      </property>
+
+      <!-- Bind to all interfaces -->
+      <property>
+        <name>yarn.resourcemanager.bind-host</name>
+        <value>0.0.0.0</value>
+      </property>
+      <property>
+        <name>yarn.nodemanager.bind-host</name>
+        <value>0.0.0.0</value>
+      </property>
+      <property>
+        <name>yarn.timeline-service.bind-host</name>
+        <value>0.0.0.0</value>
+      </property>
+      <!-- /Bind to all interfaces -->
+
+      <property>
+        <name>yarn.nodemanager.vmem-check-enabled</name>
+        <value>false</value>
+      </property>
+
+      <property>
+        <name>yarn.nodemanager.aux-services</name>
+        <value>mapreduce_shuffle</value>
+      </property>
+
+      <property>
+        <name>yarn.nodemanager.aux-services.mapreduce_shuffle.class</name>
+        <value>org.apache.hadoop.mapred.ShuffleHandler</value>
+      </property>
+
+      <property>
+        <description>List of directories to store localized files in.</description>
+        <name>yarn.nodemanager.local-dirs</name>
+        <value>/var/lib/hadoop-yarn/cache/${user.name}/nm-local-dir</value>
+      </property>
+
+      <property>
+        <description>Where to store container logs.</description>
+        <name>yarn.nodemanager.log-dirs</name>
+        <value>/var/log/hadoop-yarn/containers</value>
+      </property>
+
+      <property>
+        <description>Where to aggregate logs to.</description>
+        <name>yarn.nodemanager.remote-app-log-dir</name>
+        <value>/var/log/hadoop-yarn/apps</value>
+      </property>
+
+      <property>
+        <name>yarn.application.classpath</name>
+        <value>
+          /usr/local/hadoop/etc/hadoop,
+          /usr/local/hadoop/share/hadoop/common/*,
+          /usr/local/hadoop/share/hadoop/common/lib/*,
+          /usr/local/hadoop/share/hadoop/hdfs/*,
+          /usr/local/hadoop/share/hadoop/hdfs/lib/*,
+          /usr/local/hadoop/share/hadoop/mapreduce/*,
+          /usr/local/hadoop/share/hadoop/mapreduce/lib/*,
+          /usr/local/hadoop/share/hadoop/yarn/*,
+          /usr/local/hadoop/share/hadoop/yarn/lib/*
+        </value>
+      </property>
+    </configuration>
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: hadoop-{{ $.ObjectMeta.Name }}-hdfs-dn
+  labels:
+    app: hadoop
+    chart: hadoop-1.1.4
+    release: hadoop-{{ $.ObjectMeta.Name }}
+    component: hdfs-dn
+    operator.dameng.com/id: {{ $.Spec.ID | quote }}
+  annotations:
+    operator.dameng.com/title: {{ $.Spec.Title | hexenc | quote }}
+spec:
+  serviceName: hadoop-{{ $.ObjectMeta.Name }}-hdfs-dn
+  replicas: {{ $.Spec.Hdfs.DataNode.Replicas }}
+  selector:
+    matchLabels:
+      app: hadoop
+      release: hadoop-{{ $.ObjectMeta.Name }}
+      component: hdfs-dn
+  template:
+    metadata:
+      labels:
+        app: hadoop
+        release: hadoop-{{ $.ObjectMeta.Name }}
+        component: hdfs-dn
+        operator.dameng.com/id: {{ $.Spec.ID | quote }}
+        sidecar.istio.io/inject: "false"
+    spec:
+      affinity:
+        podAntiAffinity:
+        {{- if eq $.Spec.AntiAffinity "hard" }}
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - topologyKey: "kubernetes.io/hostname"
+            labelSelector:
+              matchLabels:
+                app: hadoop
+                release: hadoop-{{ $.ObjectMeta.Name }}
+                component: hdfs-dn
+        {{- else if eq $.Spec.AntiAffinity "soft" }}
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 5
+            podAffinityTerm:
+              topologyKey: "kubernetes.io/hostname"
+              labelSelector:
+                matchLabels:
+                  app: hadoop
+                  release: hadoop-{{ $.ObjectMeta.Name }}
+                  component: hdfs-dn
+        {{- end }}
+      terminationGracePeriodSeconds: 0
+      containers:
+      - name: hdfs-dn
+        image: "{{ $.Spec.Image.Repository }}:{{ $.Spec.Image.Tag }}"
+        imagePullPolicy: {{ $.Spec.Image.PullPolicy | quote }}
+        command:
+           - "/bin/bash"
+           - "/tmp/hadoop-config/bootstrap.sh"
+           - "-d"
+        resources:
+{{ toYaml $.Spec.Hdfs.DataNode.Resources | indent 10 }}
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 9864
+          initialDelaySeconds: 5
+          timeoutSeconds: 2
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 9864
+          initialDelaySeconds: 10
+          timeoutSeconds: 2
+        volumeMounts:
+        - name: hadoop-config
+          mountPath: /tmp/hadoop-config
+        - name: dfs
+          mountPath: /root/hdfs/datanode
+      volumes:
+      - name: hadoop-config
+        configMap:
+          name: hadoop-{{ $.ObjectMeta.Name }}
+      {{- if not $.Spec.Persistence.DataNode.Enabled }}
+      - name: dfs
+        emptyDir: {}
+      {{- end }}
+  {{- if $.Spec.Persistence.DataNode.Enabled }}
+  volumeClaimTemplates:
+  - metadata:
+      name: dfs
+      labels:
+        operator.dameng.com/id: {{ $.Spec.ID | quote }}
+    spec:
+      accessModes:
+      - {{ $.Spec.Persistence.DataNode.AccessMode | quote }}
+      storageClassName: "{{ $.Spec.Persistence.DataNode.StorageClass }}"
+      resources:
+        requests:
+          storage: {{ $.Spec.Persistence.DataNode.Size | quote }}
+  {{- end }}
+---
+apiVersion: policy/v1beta1
+kind: PodDisruptionBudget
+metadata:
+  name: hadoop-{{ $.ObjectMeta.Name }}-hdfs-dn
+  labels:
+    app: hadoop
+    chart: hadoop-1.1.4
+    release: hadoop-{{ $.ObjectMeta.Name }}
+    component: hdfs-dn
+    operator.dameng.com/id: {{ $.Spec.ID | quote }}
+spec:
+  selector:
+    matchLabels:
+      app: hadoop
+      release: hadoop-{{ $.ObjectMeta.Name }}
+      component: hdfs-dn
+  minAvailable: {{ $.Spec.Hdfs.DataNode.PdbMinAvailable }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hadoop-{{ $.ObjectMeta.Name }}-hdfs-dn
+  labels:
+    app: hadoop
+    chart: hadoop-1.1.4
+    release: hadoop-{{ $.ObjectMeta.Name }}
+    component: hdfs-dn
+    operator.dameng.com/id: {{ $.Spec.ID | quote }}
+spec:
+  ports:
+  - name: dfs
+    port: 9000
+    protocol: TCP
+  - name: webhdfs
+    port: 9864
+  clusterIP: None
+  selector:
+    app: hadoop
+    release: hadoop-{{ $.ObjectMeta.Name }}
+    component: hdfs-dn
+{{- if $.Spec.Persistence.NameNode.Enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: hadoop-{{ $.ObjectMeta.Name }}-hdfs-nn
+  labels:
+    app: hadoop
+    chart: hadoop-1.1.4
+    release: hadoop-{{ $.ObjectMeta.Name }}
+    component: hdfs-nn
+    operator.dameng.com/id: {{ $.Spec.ID | quote }}
+spec:
+  accessModes:
+  - {{ $.Spec.Persistence.NameNode.AccessMode | quote }}
+  storageClassName: "{{ $.Spec.Persistence.NameNode.StorageClass }}"
+  resources:
+    requests:
+      storage: {{ $.Spec.Persistence.NameNode.Size | quote }}
+{{- end }}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: hadoop-{{ $.ObjectMeta.Name }}-hdfs-nn
+  labels:
+    app: hadoop
+    chart: hadoop-1.1.4
+    release: hadoop-{{ $.ObjectMeta.Name }}
+    component: hdfs-nn
+    operator.dameng.com/id: {{ $.Spec.ID | quote }}
+  annotations:
+    operator.dameng.com/title: {{ $.Spec.Title | hexenc | quote }}
+spec:
+  serviceName: hadoop-{{ $.ObjectMeta.Name }}-hdfs-nn
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hadoop
+      release: hadoop-{{ $.ObjectMeta.Name }}
+      component: hdfs-nn
+  template:
+    metadata:
+      labels:
+        app: hadoop
+        release: hadoop-{{ $.ObjectMeta.Name }}
+        component: hdfs-nn
+        operator.dameng.com/id: {{ $.Spec.ID | quote }}
+        sidecar.istio.io/inject: "false"
+    spec:
+      affinity:
+        podAntiAffinity:
+        {{- if eq $.Spec.AntiAffinity "hard" }}
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - topologyKey: "kubernetes.io/hostname"
+            labelSelector:
+              matchLabels:
+                app: hadoop
+                release: hadoop-{{ $.ObjectMeta.Name }}
+                component: hdfs-nn
+        {{- else if eq $.Spec.AntiAffinity "soft" }}
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 5
+            podAffinityTerm:
+              topologyKey: "kubernetes.io/hostname"
+              labelSelector:
+                matchLabels:
+                  app: hadoop
+                  release: hadoop-{{ $.ObjectMeta.Name }}
+                  component: hdfs-nn
+        {{- end }}
+      terminationGracePeriodSeconds: 0
+      containers:
+      - name: hdfs-nn
+        image: "{{ $.Spec.Image.Repository }}:{{ $.Spec.Image.Tag }}"
+        imagePullPolicy: {{ $.Spec.Image.PullPolicy | quote }}
+        command:
+        - "/bin/bash"
+        - "/tmp/hadoop-config/bootstrap.sh"
+        - "-d"
+        resources:
+{{ toYaml $.Spec.Hdfs.NameNode.Resources | indent 10 }}
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 9870
+          initialDelaySeconds: 5
+          timeoutSeconds: 2
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 9870
+          initialDelaySeconds: 10
+          timeoutSeconds: 2
+        volumeMounts:
+        - name: hadoop-config
+          mountPath: /tmp/hadoop-config
+        - name: dfs
+          mountPath: /root/hdfs/namenode
+      volumes:
+      - name: hadoop-config
+        configMap:
+          name: hadoop-{{ $.ObjectMeta.Name }}
+      - name: dfs
+      {{- if $.Spec.Persistence.NameNode.Enabled }}
+        persistentVolumeClaim:
+          claimName: hadoop-{{ $.ObjectMeta.Name }}-hdfs-nn
+      {{- else }}
+        emptyDir: {}
+      {{- end }}
+---
+apiVersion: policy/v1beta1
+kind: PodDisruptionBudget
+metadata:
+  name: hadoop-{{ $.ObjectMeta.Name }}-hdfs-nn
+  labels:
+    app: hadoop
+    chart: hadoop-1.1.4
+    release: hadoop-{{ $.ObjectMeta.Name }}
+    component: hdfs-nn
+    operator.dameng.com/id: {{ $.Spec.ID | quote }}
+spec:
+  selector:
+    matchLabels:
+      app: hadoop
+      release: hadoop-{{ $.ObjectMeta.Name }}
+      component: hdfs-nn
+  minAvailable: {{ $.Spec.Hdfs.NameNode.PdbMinAvailable }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hadoop-{{ $.ObjectMeta.Name }}-hdfs-nn
+  labels:
+    app: hadoop
+    chart: hadoop-1.1.4
+    release: hadoop-{{ $.ObjectMeta.Name }}
+    component: hdfs-nn
+    operator.dameng.com/id: {{ $.Spec.ID | quote }}
+spec:
+  ports:
+  - name: dfs
+    port: 9000
+    protocol: TCP
+  - name: webhdfs
+    port: 9870
+  clusterIP: None
+  selector:
+    app: hadoop
+    release: hadoop-{{ $.ObjectMeta.Name }}
+    component: hdfs-nn
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: hadoop-{{ $.ObjectMeta.Name }}-yarn-rm
+  labels:
+    app: hadoop
+    chart: hadoop-1.1.4
+    release: hadoop-{{ $.ObjectMeta.Name }}
+    component: yarn-rm
+    operator.dameng.com/id: {{ $.Spec.ID | quote }}
+  annotations:
+    operator.dameng.com/title: {{ $.Spec.Title | hexenc | quote }}
+spec:
+  serviceName: hadoop-{{ $.ObjectMeta.Name }}-yarn-rm
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hadoop
+      release: hadoop-{{ $.ObjectMeta.Name }}
+      component: yarn-rm
+  template:
+    metadata:
+      labels:
+        app: hadoop
+        release: hadoop-{{ $.ObjectMeta.Name }}
+        component: yarn-rm
+        operator.dameng.com/id: {{ $.Spec.ID | quote }}
+        sidecar.istio.io/inject: "false"
+    spec:
+      affinity:
+        podAntiAffinity:
+        {{- if eq $.Spec.AntiAffinity "hard" }}
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - topologyKey: "kubernetes.io/hostname"
+            labelSelector:
+              matchLabels:
+                app: hadoop
+                release: hadoop-{{ $.ObjectMeta.Name }}
+                component: yarn-rm
+        {{- else if eq $.Spec.AntiAffinity "soft" }}
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 5
+            podAffinityTerm:
+              topologyKey: "kubernetes.io/hostname"
+              labelSelector:
+                matchLabels:
+                  app: hadoop
+                  release: hadoop-{{ $.ObjectMeta.Name }}
+                  component: yarn-rm
+        {{- end }}
+      terminationGracePeriodSeconds: 0
+      containers:
+      - name: yarn-rm
+        image: "{{ $.Spec.Image.Repository }}:{{ $.Spec.Image.Tag }}"
+        imagePullPolicy: {{ $.Spec.Image.PullPolicy | quote }}
+        ports:
+        - containerPort: 8088
+          name: web
+        command:
+           - "/bin/bash"
+           - "/tmp/hadoop-config/bootstrap.sh"
+           - "-d"
+        resources:
+{{ toYaml $.Spec.Yarn.ResourceManager.Resources | indent 10 }}
+        readinessProbe:
+          httpGet:
+            path: /ws/v1/cluster/info
+            port: 8088
+          initialDelaySeconds: 5
+          timeoutSeconds: 2
+        livenessProbe:
+          httpGet:
+            path: /ws/v1/cluster/info
+            port: 8088
+          initialDelaySeconds: 10
+          timeoutSeconds: 2
+        volumeMounts:
+        - name: hadoop-config
+          mountPath: /tmp/hadoop-config
+      volumes:
+      - name: hadoop-config
+        configMap:
+          name: hadoop-{{ $.ObjectMeta.Name }}
+---
+apiVersion: policy/v1beta1
+kind: PodDisruptionBudget
+metadata:
+  name: hadoop-{{ $.ObjectMeta.Name }}-yarn-rm
+  labels:
+    app: hadoop
+    chart: hadoop-1.1.4
+    release: hadoop-{{ $.ObjectMeta.Name }}
+    component: yarn-rm
+    operator.dameng.com/id: {{ $.Spec.ID | quote }}
+spec:
+  selector:
+    matchLabels:
+      app: hadoop
+      release: hadoop-{{ $.ObjectMeta.Name }}
+      component: yarn-rm
+  minAvailable: {{ $.Spec.Yarn.ResourceManager.PdbMinAvailable }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hadoop-{{ $.ObjectMeta.Name }}-yarn-rm
+  labels:
+    app: hadoop
+    chart: hadoop-1.1.4
+    release: hadoop-{{ $.ObjectMeta.Name }}
+    component: yarn-rm
+    operator.dameng.com/id: {{ $.Spec.ID | quote }}
+spec:
+  ports:
+  - port: 8088
+    name: web
+  clusterIP: None
+  selector:
+    app: hadoop
+    release: hadoop-{{ $.ObjectMeta.Name }}
+    component: yarn-rm
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: hadoop-{{ $.ObjectMeta.Name }}-yarn-nm
+  labels:
+    app: hadoop
+    chart: hadoop-1.1.4
+    release: hadoop-{{ $.ObjectMeta.Name }}
+    component: yarn-nm
+    operator.dameng.com/id: {{ $.Spec.ID | quote }}
+  annotations:
+    operator.dameng.com/title: {{ $.Spec.Title | hexenc | quote }}
+spec:
+  serviceName: hadoop-{{ $.ObjectMeta.Name }}-yarn-nm
+  replicas: {{ $.Spec.Yarn.NodeManager.Replicas }}
+  selector:
+    matchLabels:
+      app: hadoop
+      release: hadoop-{{ $.ObjectMeta.Name }}
+      component: yarn-nm
+{{- if $.Spec.Yarn.NodeManager.ParallelCreate }}
+  podManagementPolicy: Parallel
+{{- end }}
+  template:
+    metadata:
+      labels:
+        app: hadoop
+        release: hadoop-{{ $.ObjectMeta.Name }}
+        component: yarn-nm
+        operator.dameng.com/id: {{ $.Spec.ID | quote }}
+        sidecar.istio.io/inject: "false"
+    spec:
+      affinity:
+        podAntiAffinity:
+        {{- if eq $.Spec.AntiAffinity "hard" }}
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - topologyKey: "kubernetes.io/hostname"
+            labelSelector:
+              matchLabels:
+                app: hadoop
+                release: hadoop-{{ $.ObjectMeta.Name }}
+                component: yarn-nm
+        {{- else if eq $.Spec.AntiAffinity "soft" }}
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 5
+            podAffinityTerm:
+              topologyKey: "kubernetes.io/hostname"
+              labelSelector:
+                matchLabels:
+                  app: hadoop
+                  release: hadoop-{{ $.ObjectMeta.Name }}
+                  component: yarn-nm
+        {{- end }}
+      terminationGracePeriodSeconds: 0
+      containers:
+      - name: yarn-nm
+        image: "{{ $.Spec.Image.Repository }}:{{ $.Spec.Image.Tag }}"
+        imagePullPolicy: {{ $.Spec.Image.PullPolicy | quote }}
+        ports:
+        - containerPort: 8088
+          name: web
+        command:
+           - "/bin/bash"
+           - "/tmp/hadoop-config/bootstrap.sh"
+           - "-d"
+        resources:
+{{ toYaml $.Spec.Yarn.NodeManager.Resources | indent 10 }}
+        readinessProbe:
+          httpGet:
+            path: /node
+            port: 8042
+          initialDelaySeconds: 10
+          timeoutSeconds: 2
+        livenessProbe:
+          httpGet:
+            path: /node
+            port: 8042
+          initialDelaySeconds: 10
+          timeoutSeconds: 2
+        env:
+        - name: MY_CPU_LIMIT
+          valueFrom:
+            resourceFieldRef:
+              containerName: yarn-nm
+              resource: limits.cpu
+              divisor: 1
+        - name: MY_MEM_LIMIT
+          valueFrom:
+            resourceFieldRef:
+              containerName: yarn-nm
+              resource: limits.memory
+              divisor: 1M
+        volumeMounts:
+        - name: hadoop-config
+          mountPath: /tmp/hadoop-config
+      volumes:
+      - name: hadoop-config
+        configMap:
+          name: hadoop-{{ $.ObjectMeta.Name }}
+---
+apiVersion: policy/v1beta1
+kind: PodDisruptionBudget
+metadata:
+  name: hadoop-{{ $.ObjectMeta.Name }}-yarn-nm
+  labels:
+    app: hadoop
+    chart: hadoop-1.1.4
+    release: hadoop-{{ $.ObjectMeta.Name }}
+    component: yarn-nm
+    operator.dameng.com/id: {{ $.Spec.ID | quote }}
+spec:
+  selector:
+    matchLabels:
+      app: hadoop
+      release: hadoop-{{ $.ObjectMeta.Name }}
+      component: yarn-nm
+  minAvailable: {{ $.Spec.Yarn.NodeManager.PdbMinAvailable }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hadoop-{{ $.ObjectMeta.Name }}-yarn-nm
+  labels:
+    app: hadoop
+    chart: hadoop-1.1.4
+    release: hadoop-{{ $.ObjectMeta.Name }}
+    component: yarn-nm
+    operator.dameng.com/id: {{ $.Spec.ID | quote }}
+spec:
+  ports:
+  - port: 8088
+    name: web
+  - port: 8082
+    name: web2
+  - port: 8042
+    name: api
+  clusterIP: None
+  selector:
+    app: hadoop
+    release: hadoop-{{ $.ObjectMeta.Name }}
+    component: yarn-nm
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hadoop-{{ $.ObjectMeta.Name }}-hdfs-ui
+  labels:
+    app: hadoop
+    chart: hadoop-1.1.4
+    release: hadoop-{{ $.ObjectMeta.Name }}
+    component: hdfs-ui
+    operator.dameng.com/id: {{ $.Spec.ID | quote }}
+spec:
+  type: NodePort
+  ports:
+    - port: 9870
+      name: web
+  selector:
+    app: hadoop
+    release: hadoop-{{ $.ObjectMeta.Name }}
+    component: hdfs-nn
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hadoop-{{ $.ObjectMeta.Name }}-yarn-ui
+  labels:
+    app: hadoop
+    chart: hadoop-1.1.4
+    release: hadoop-{{ $.ObjectMeta.Name }}
+    component: yarn-ui
+    operator.dameng.com/id: {{ $.Spec.ID | quote }}
+spec:
+  type: NodePort
+  ports:
+  - port: 8088
+    name: web
+  selector:
+    app: hadoop
+    release: hadoop-{{ $.ObjectMeta.Name }}
+    component: yarn-rm
+{{- if $.Spec.PostInstallCommands }}
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: hadoop-{{ $.ObjectMeta.Name }}-post-install-cmds
+  labels:
+    app: hadoop
+    chart: hadoop-1.1.4
+    release: hadoop-{{ $.ObjectMeta.Name }}
+    component: post-install-cmds
+    operator.dameng.com/id: {{ $.Spec.ID | quote }}
+    sidecar.istio.io/inject: "false"
+  annotations:
+    # This is what defines this resource as a hook. Without this line, the
+    # job is considered part of the release.
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-delete-policy: hook-succeeded
+    helm.sh/hook-weight: "10"
+spec:
+  restartPolicy: OnFailure
+  containers:
+  - name: cmds
+    image: "{{ $.Spec.Image.Repository }}:{{ $.Spec.Image.Tag }}"
+    imagePullPolicy: {{ $.Spec.Image.PullPolicy | quote }}
+    #command: ["/bin/bash", "-c", "until hdfs dfs -ls / >/dev/null 2>&1 || [ $(( ATTEMPTS++ )) -gt 300 ]; do echo \"$(date) - Waiting for HDFS instance to be ready...\" && sleep 10; done && {{ join " && " $.Spec.PostInstallCommands}}"]
+    command:
+    - "/bin/bash"
+    - "/tmp/hadoop-config/shell.sh"
+    volumeMounts:
+    - name: hadoop-config
+      mountPath: /tmp/hadoop-config
+  volumes:
+  - name: hadoop-config
+    configMap:
+      name: hadoop-{{ $.ObjectMeta.Name }}
+{{- end }}

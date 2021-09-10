@@ -4,6 +4,7 @@ go 1.16
 
 require (
 	github.com/Masterminds/sprig/v3 v3.2.2
+	github.com/Pallinder/go-randomdata v1.2.0
 	github.com/fatih/structs v1.1.0
 	github.com/onsi/ginkgo v1.16.4
 	github.com/onsi/gomega v1.13.0

@@ -1,9 +1,7 @@
----
 apiVersion: hadoop.dameng.com/v1
 kind: Hadoop
 metadata:
-  name: hadoop-sample
-  namespace: system
+  name: hadoop-sample-pvc
 spec:
   # The base hadoop image to use for all components.
   # See this repo for image build details: https://github.com/chenseanxy/helm-hadoop-3/tree/master/image
@@ -79,15 +77,19 @@ spec:
 
   persistence:
     nameNode:
-      enabled: false
-      storageClass: "-"
+      enabled: true
+      storageClass: "rook-ceph-block"
+      accessMode: ReadWriteOnce
+      size: 10Gi
+
+    dataNode:
+      enabled: true
+      storageClass: "rook-ceph-block"
       accessMode: ReadWriteOnce
       size: 50Gi
 
-    dataNode:
-      enabled: false
-      storageClass: "-"
-      accessMode: ReadWriteOnce
-      size: 200Gi
-
-  postInstallCommands: []
+  postInstallCommands:
+  - hdfs dfs -mkdir -p /accumulo
+  - hdfs dfs -chown accumulo /accumulo
+  - hdfs dfs -chmod 700 /accumulo
+  - hdfs dfs -ls /

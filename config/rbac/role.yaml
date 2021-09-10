@@ -7,7 +7,36 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
-  - cache.dameng.hadoop.com
+  - apps
+  resources:
+  - statefulsets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  - persistentvolumeclaims
+  - persistentvolumes
+  - pods
+  - secrets
+  - services
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - hadoop.dameng.com
   resources:
   - hadoops
   verbs:
@@ -19,16 +48,40 @@ rules:
   - update
   - watch
 - apiGroups:
-  - cache.dameng.hadoop.com
+  - hadoop.dameng.com
   resources:
   - hadoops/finalizers
   verbs:
   - update
 - apiGroups:
-  - cache.dameng.hadoop.com
+  - hadoop.dameng.com
   resources:
   - hadoops/status
   verbs:
   - get
   - patch
   - update
+- apiGroups:
+  - networking.istio.io
+  resources:
+  - destinationrules
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - policy
+  resources:
+  - poddisruptionbudgets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch

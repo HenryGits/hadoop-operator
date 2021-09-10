@@ -18,7 +18,7 @@ package hadoop
 
 import (
 	"context"
-	"github.com/HenryGits/hadoop-operator/pkg/tools"
+	"github.com/HenryGits/hadoop-operator/controllers/tools"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -55,6 +55,10 @@ type HadoopReconciler struct {
 //+kubebuilder:rbac:groups=hadoop.dameng.com,resources=hadoops,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=hadoop.dameng.com,resources=hadoops/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=hadoop.dameng.com,resources=hadoops/finalizers,verbs=update
+//+kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=core,resources=pods;services;persistentvolumes;persistentvolumeclaims;configmaps;secrets,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=networking.istio.io,resources=destinationrules,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=policy,resources=poddisruptionbudgets,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -69,6 +73,7 @@ func (r *HadoopReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	logger := log.FromContext(ctx)
 	logger.Info("==========HadoopReconciler begin to Reconcile==========")
 
+	// 获取 Hadoop 实例
 	var origin = &hadoopv1.Hadoop{}
 	if err := r.Get(ctx, req.NamespacedName, origin); err != nil {
 		logger.Error(err, "unable to fetch hadoop")
@@ -79,7 +84,7 @@ func (r *HadoopReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	hadoop := origin.DeepCopy()
 	hadoop.Status.Phase = hadoopv1.Reconciling
 
-	// examine DeletionTimestamp to determine if object is under deletion
+	// 检查 DeletionTimestamp 以确定对象是否正在删除
 	if origin.ObjectMeta.DeletionTimestamp.IsZero() {
 		// The object is not being deleted, so if it does not have our finalizer,
 		// then lets add the finalizer and update the object. This is equivalent
@@ -151,7 +156,7 @@ func (r *HadoopReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			}
 		}
 	} else {
-		// The object is being deleted
+		// 正在删除对象
 		if tools.ContainsString(origin.GetFinalizers(), Finalizer) {
 			// our finalizer is present, so lets handle any external dependency
 			if err := r.deleteExternalResources(ctx, origin); err != nil {
