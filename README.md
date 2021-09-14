@@ -35,7 +35,6 @@ mkdir -p $GOPATH/src/github.com/HenryGits/hadoop-operator && cd $GOPATH/src/gith
 operator-sdk init --domain dameng.com --repo github.com/HenryGits/hadoop-operator
 operator-sdk edit --multigroup=true
 operator-sdk create api --group hadoop --version v1 --kind Hadoop --resource --controller
-
 ```
 
 #### code-generator 的使用

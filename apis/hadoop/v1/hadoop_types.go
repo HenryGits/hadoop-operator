@@ -62,23 +62,9 @@ type HadoopSpec struct {
 	// +optional
 	Describe string `json:"describe,omitempty"`
 
-	// Image is the base hadoop image to use for all components.
 	// +optional
-	// +kubebuilder:default:={repository: "hadoop", tag: "v3.3.1", pullPolicy: "IfNotPresent"}
-	//Image Image `json:"image,omitempty"`
-	// AntiAffinity Select antiAffinity as either hard or soft, default is soft
-	// +optional
-	// +kubebuilder:validation:Enum={soft,hard}
-	// +kubebuilder:default="soft"
-	//AntiAffinity AntiAffinity `json:"antiAffinity,omitempty"`
-
-	// Hdfs is hadoop hdfs components include NameNode, DataNode, WebHdfs
-	// +optional
-	NameNode *NameNode `json:"nameNode,omitempty"`
-	// +optional
-	DataNode *DataNode `json:"dataNode,omitempty"`
-	WebHdfs  *WebHdfs  `json:"webHdfs,omitempty"`
-
+	Hdfs    *Hdfs    `json:"hdfs,omitempty"`
+	WebHdfs *WebHdfs `json:"webHdfs,omitempty"`
 	// Yarn is hadoop yarn components include ResourceManager, NodeManager
 	// +optional
 	ResourceManager *ResourceManager `json:"resourceManager,omitempty"`
@@ -124,35 +110,15 @@ type Image struct {
 	PullPolicy corev1.PullPolicy `json:"pullPolicy,omitempty"`
 }
 
-type AntiAffinity string
-
-const (
-	Soft AntiAffinity = "soft"
-	Hard AntiAffinity = "hard"
-)
-
-type NameNode struct {
+// Hdfs  Hadoop nn & dn
+type Hdfs struct {
+	// +optional
+	// +kubebuilder:validation:Enum={NameNode,DataNode}
+	Type string `json:"type,omitempty"`
 	// DaemonSet specifies the hadoop should be deployed as a DaemonSet, and allows providing its spec.
 	// Cannot be used along with `deployment`. If both are absent a default for the Type is used.
 	// +optional
 	DaemonSet *appsv1.DaemonSet `json:"daemonSet,omitempty"`
-	// Resources is the CPU and memory resource (requests and limits) allocated to each Hadoop component pod.
-	// This should be tuned to fit your workload.
-	// +optional
-	// +kubebuilder:default:={requests: {cpu: "100m", memory: "256Mi"}, limits: {cpu: "500m", memory: "1Gi"}}
-	//Resources *ResourceRequirements `json:"resources,omitempty"`
-}
-
-type DataNode struct {
-	// DaemonSet specifies the hadoop should be deployed as a DaemonSet, and allows providing its spec.
-	// Cannot be used along with `deployment`. If both are absent a default for the Type is used.
-	// +optional
-	DaemonSet *appsv1.DaemonSet `json:"daemonSet,omitempty"`
-	// Resources is the CPU and memory resource (requests and limits) allocated to each Hadoop component pod.
-	// This should be tuned to fit your workload.
-	// +optional
-	// +kubebuilder:default:={requests: {cpu: "100m", memory: "256Mi"}, limits: {cpu: "500m", memory: "1Gi"}}
-	//Resources *ResourceRequirements `json:"resources,omitempty"`
 }
 
 type WebHdfs struct {

@@ -8,9 +8,6 @@ configMapGenerator:
 - files:
   - controller_manager_config.yaml
   name: manager-config
-- files:
-  - templates/hadoop.dameng.com_hadoop.gotmpl
-  name: manager-template
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 images:
