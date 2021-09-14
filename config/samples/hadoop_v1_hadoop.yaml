@@ -5,44 +5,107 @@ metadata:
   name: hadoop-sample
   namespace: system
 spec:
-  # The base hadoop image to use for all components.
-  # See this repo for image build details: https://github.com/chenseanxy/helm-hadoop-3/tree/master/image
-  image:
-    repository: jasonchrion/hadoop
-    tag: 3.2.2-nolib
-    pullPolicy: IfNotPresent
-
-  # The version of the hadoop libraries being used in the image.
-  hadoopVersion: 3.2.2
-
-  # Select antiAffinity as either hard or soft, default is soft
-  antiAffinity: "soft"
-
-  hdfs:
-    nameNode:
-      pdbMinAvailable: 1
-
-      resources:
-        requests:
-          memory: "256Mi"
-          cpu: "100m"
-        limits:
-          memory: "2048Mi"
-          cpu: "1000m"
-
+  id: "id"
+  title: "title"
+  describe: "describe"
+  nameNode:
+    daemonSet:
+      metadata:
+        name: nn
+        namespace: system
+      spec:
+        selector:
+          matchLabels:
+            app: nn
+        template:
+          metadata:
+            labels:
+              app: nn
+          spec:
+            serviceAccountName: hadoop-nn-admin
+            containers:
+              - image: "hadoop:v3.3.1"
+                imagePullPolicy: "IfNotPresent"
+                name: provisioner
+                securityContext:
+                  privileged: true
+                env:
+                - name: MY_NODE_NAME
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: spec.nodeName
+                volumeMounts:
+      #            - name: provisioner-config
+      #              mountPath: /etc/provisioner/config
+      #              readOnly: true
+                  - name: nn-dir
+                    mountPath: /usr/local/hadoop/nn
+                    mountPropagation: "HostToContainer"
+                resources:
+                  requests:
+                    memory: "256Mi"
+                    cpu: "100m"
+                  limits:
+                    memory: "2048Mi"
+                    cpu: "1000m"
+            volumes:
+      #        - name: provisioner-config
+      #          configMap:
+      #            name: local-provisioner-config
+              - name: nn-dir
+                hostPath:
+                  # Ensure the file directory is created.
+                  path: /home/data
+                  type: DirectoryOrCreate
     dataNode:
-      replicas: 3
-
-      pdbMinAvailable: 1
-
-      resources:
-        requests:
-          memory: "256Mi"
-          cpu: "100m"
-        limits:
-          memory: "2048Mi"
-          cpu: "1000m"
-
+      daemonSet:
+        metadata:
+          name: dn
+          namespace: system
+        spec:
+          selector:
+            matchLabels:
+              app: dn
+          template:
+            metadata:
+              labels:
+                app: dn
+            spec:
+              serviceAccountName: hadoop-nn-admin
+              containers:
+                - image: "hadoop:v3.3.1"
+                  imagePullPolicy: "IfNotPresent"
+                  name: provisioner
+                  securityContext:
+                    privileged: true
+                  env:
+                  - name: MY_NODE_NAME
+                    valueFrom:
+                      fieldRef:
+                        fieldPath: spec.nodeName
+                  volumeMounts:
+        #            - name: provisioner-config
+        #              mountPath: /etc/provisioner/config
+        #              readOnly: true
+                    - name: nn-dir
+                      mountPath: /usr/local/hadoop/dn
+                      mountPropagation: "HostToContainer"
+                  resources:
+                    requests:
+                      memory: "256Mi"
+                      cpu: "100m"
+                    limits:
+                      memory: "2048Mi"
+                      cpu: "1000m"
+              volumes:
+        #        - name: provisioner-config
+        #          configMap:
+        #            name: local-provisioner-config
+                - name: nn-dir
+                  hostPath:
+                    # Ensure the file directory is created.
+                    path: /home/data
+                    type: DirectoryOrCreate
     webHdfs:
       enabled: true
 

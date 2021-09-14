@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -60,32 +61,29 @@ type HadoopSpec struct {
 	// Describe is the description of the hadoop release
 	// +optional
 	Describe string `json:"describe,omitempty"`
+
 	// Image is the base hadoop image to use for all components.
 	// +optional
-	// +kubebuilder:default:={repository: "jasonchrion/hadoop", tag: "3.2.2-nolib", pullPolicy: "IfNotPresent"}
-	Image Image `json:"image,omitempty"`
-	// HadoopVersion is the version of the hadoop libraries being used in the image.
-	// +optional
-	// +kubebuilder:default="3.2.2"
-	HadoopVersion string `json:"hadoopVersion,omitempty"`
+	// +kubebuilder:default:={repository: "hadoop", tag: "v3.3.1", pullPolicy: "IfNotPresent"}
+	//Image Image `json:"image,omitempty"`
 	// AntiAffinity Select antiAffinity as either hard or soft, default is soft
 	// +optional
 	// +kubebuilder:validation:Enum={soft,hard}
 	// +kubebuilder:default="soft"
-	AntiAffinity AntiAffinity `json:"antiAffinity,omitempty"`
+	//AntiAffinity AntiAffinity `json:"antiAffinity,omitempty"`
+
 	// Hdfs is hadoop hdfs components include NameNode, DataNode, WebHdfs
 	// +optional
-	Hdfs *Hdfs `json:"hdfs,omitempty"`
+	NameNode *NameNode `json:"nameNode,omitempty"`
+	// +optional
+	DataNode *DataNode `json:"dataNode,omitempty"`
+	WebHdfs  *WebHdfs  `json:"webHdfs,omitempty"`
+
 	// Yarn is hadoop yarn components include ResourceManager, NodeManager
 	// +optional
-	Yarn *Yarn `json:"yarn,omitempty"`
-	// Persistence is persistent volume for Hadoop components
-	// +optional
-	Persistence *Persistence `json:"persistence,omitempty"`
-	// PostInstallCommands is the hdfs commands to be run after the installation
-	// +optional
-	// +kubebuilder:default={}
-	PostInstallCommands []string `json:"postInstallCommands,omitempty"`
+	ResourceManager *ResourceManager `json:"resourceManager,omitempty"`
+	NodeManager     *NodeManager     `json:"nodeManager,omitempty"`
+	HistoryServer   *HistoryServer   `json:"historyServer,omitempty"`
 }
 
 // HadoopStatus defines the observed state of Hadoop
@@ -113,11 +111,11 @@ func init() {
 type Image struct {
 	// Repository is Hadoop image repository
 	// +optional
-	// +kubebuilder:default="jasonchrion/hadoop"
+	// +kubebuilder:default="hadoop"
 	Repository string `json:"repository,omitempty"`
 	// Tag is the Hadoop image tag
 	// +optional
-	// +kubebuilder:default="3.2.2-nolib"
+	// +kubebuilder:default="v3.3.1"
 	Tag string `json:"tag,omitempty"`
 	// PullPolicy is the pull policy for the images
 	// +optional
@@ -133,40 +131,28 @@ const (
 	Hard AntiAffinity = "hard"
 )
 
-type Hdfs struct {
-	NameNode *NameNode `json:"nameNode,omitempty"`
-	DataNode *DataNode `json:"dataNode,omitempty"`
-	WebHdfs  *WebHdfs  `json:"webHdfs,omitempty"`
-}
-
 type NameNode struct {
-	// PdbMinAvailable is the minimum available number of PodDisruptionBudget for Hadoop component
+	// DaemonSet specifies the hadoop should be deployed as a DaemonSet, and allows providing its spec.
+	// Cannot be used along with `deployment`. If both are absent a default for the Type is used.
 	// +optional
-	// +kubebuilder:validation:Minimum=1
-	// +kubebuilder:default=1
-	PdbMinAvailable *int32 `json:"pdbMinAvailable,omitempty"`
+	DaemonSet *appsv1.DaemonSet `json:"daemonSet,omitempty"`
 	// Resources is the CPU and memory resource (requests and limits) allocated to each Hadoop component pod.
 	// This should be tuned to fit your workload.
 	// +optional
 	// +kubebuilder:default:={requests: {cpu: "100m", memory: "256Mi"}, limits: {cpu: "500m", memory: "1Gi"}}
-	Resources *ResourceRequirements `json:"resources,omitempty"`
+	//Resources *ResourceRequirements `json:"resources,omitempty"`
 }
 
 type DataNode struct {
-	// Replicas is the pod number of Hadoop component.
+	// DaemonSet specifies the hadoop should be deployed as a DaemonSet, and allows providing its spec.
+	// Cannot be used along with `deployment`. If both are absent a default for the Type is used.
 	// +optional
-	// +kubebuilder:default:=3
-	Replicas *int32 `json:"replicas,omitempty"`
-	// PdbMinAvailable is the minimum available number of PodDisruptionBudget for Hadoop component
-	// +optional
-	// +kubebuilder:validation:Minimum=1
-	// +kubebuilder:default=1
-	PdbMinAvailable *int32 `json:"pdbMinAvailable,omitempty"`
+	DaemonSet *appsv1.DaemonSet `json:"daemonSet,omitempty"`
 	// Resources is the CPU and memory resource (requests and limits) allocated to each Hadoop component pod.
 	// This should be tuned to fit your workload.
 	// +optional
 	// +kubebuilder:default:={requests: {cpu: "100m", memory: "256Mi"}, limits: {cpu: "500m", memory: "1Gi"}}
-	Resources *ResourceRequirements `json:"resources,omitempty"`
+	//Resources *ResourceRequirements `json:"resources,omitempty"`
 }
 
 type WebHdfs struct {
@@ -175,11 +161,6 @@ type WebHdfs struct {
 	// +kubebuilder:validation:Enum=true;false
 	// +kubebuilder:default=true
 	Enabled bool `json:"enabled,omitempty"`
-}
-
-type Yarn struct {
-	ResourceManager *ResourceManager `json:"resourceManager,omitempty"`
-	NodeManager     *NodeManager     `json:"nodeManager,omitempty"`
 }
 
 type ResourceManager struct {
@@ -198,7 +179,7 @@ type ResourceManager struct {
 type NodeManager struct {
 	// Replicas is the pod number of Hadoop component.
 	// +optional
-	// +kubebuilder:default:=3
+	// +kubebuilder:default:=1
 	Replicas *int32 `json:"replicas,omitempty"`
 	// PdbMinAvailable is the minimum available number of PodDisruptionBudget for Hadoop component
 	// +optional
@@ -217,55 +198,17 @@ type NodeManager struct {
 	ParallelCreate bool `json:"parallelCreate,omitempty"`
 }
 
-type Persistence struct {
-	NameNode NameNodePersistence `json:"nameNode,omitempty"`
-	DataNode DataNodePersistence `json:"dataNode,omitempty"`
-}
-
-type NameNodePersistence struct {
-	// Enabled is whether to enable Hadoop component persistence or not
+type HistoryServer struct {
+	// Resources is the CPU and memory resource (requests and limits) allocated to each Hadoop component pod.
+	// This should be tuned to fit your workload.
+	// +optional
+	// +kubebuilder:default:={requests: {cpu: "100m", memory: "256Mi"}, limits: {cpu: "500m", memory: "1Gi"}}
+	Resources *ResourceRequirements `json:"resources,omitempty"`
+	// ParallelCreate is whether to create all nodeManager statefulset pods in parallel or not (K8S 1.7+)
 	// +optional
 	// +kubebuilder:validation:Enum={true,false}
-	// +kubebuilder:default=false
-	Enabled bool `json:"enabled,omitempty"`
-	// StorageClass is the name of the StorageClass required by the claim.
-	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1
-	// +optional
-	// +kubebuilder:default="-"
-	StorageClass *string `json:"storageClass,omitempty"`
-	// AccessMode contains the desired access modes the volume should have.
-	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1
-	// +optional
-	// +kubebuilder:validation:Enum={ReadWriteOnce,ReadOnlyMany,ReadWriteMany}
-	// +kubebuilder:default="ReadWriteOnce"
-	AccessMode corev1.PersistentVolumeAccessMode `json:"accessMode,omitempty"`
-	// Size is the size of the volume
-	// +optional
-	// +kubebuilder:default:="50Gi"
-	Size string `json:"size,omitempty"`
-}
-
-type DataNodePersistence struct {
-	// Enabled is whether to enable Hadoop component persistence or not
-	// +optional
-	// +kubebuilder:validation:Enum={true,false}
-	// +kubebuilder:default=false
-	Enabled bool `json:"enabled,omitempty"`
-	// StorageClass is the name of the StorageClass required by the claim.
-	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1
-	// +optional
-	// +kubebuilder:default="-"
-	StorageClass *string `json:"storageClass,omitempty"`
-	// AccessMode contains the desired access modes the volume should have.
-	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1
-	// +optional
-	// +kubebuilder:validation:Enum={ReadWriteOnce,ReadOnlyMany,ReadWriteMany}
-	// +kubebuilder:default="ReadWriteOnce"
-	AccessMode corev1.PersistentVolumeAccessMode `json:"accessMode,omitempty"`
-	// Size is the size of the volume
-	// +optional
-	// +kubebuilder:default:="200Gi"
-	Size string `json:"size,omitempty"`
+	// +kubebuilder:default=true
+	ParallelCreate bool `json:"parallelCreate,omitempty"`
 }
 
 // ResourceRequirements describes the compute resource requirements.

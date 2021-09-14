@@ -1,0 +1,10 @@
+FROM gcr.io/distroless/static:latest
+
+MAINTAINER ZHC
+LABEL REPOSITORY=zhc/jdk TAG=1.0.0
+
+ENV JAVA_HOME=/usr/local/jdk
+ENV CLASSPATH=.:${JAVA_HOME}/jre/lib/rt.jar:${JAVA_HOME}/lib/dt.jar:${JAVA_HOME}/lib/tools.jar
+ENV PATH=$PATH:${JAVA_HOME}/bin
+
+ENTRYPOINT ["/entrypoint.sh"]

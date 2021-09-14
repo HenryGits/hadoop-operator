@@ -35,6 +35,7 @@ mkdir -p $GOPATH/src/github.com/HenryGits/hadoop-operator && cd $GOPATH/src/gith
 operator-sdk init --domain dameng.com --repo github.com/HenryGits/hadoop-operator
 operator-sdk edit --multigroup=true
 operator-sdk create api --group hadoop --version v1 --kind Hadoop --resource --controller
+
 ```
 
 #### code-generator 的使用
@@ -77,4 +78,14 @@ source <(kubebuilder completion bash)
 如果您尝试将 CustomResources 与基于 Kubernetes 1.8 的 client-go 一起使用——有些人可能已经很高兴了，因为他们不小心提供了 master 分支的 k8s.op/apimachinery——你遇到了 CustomResource 类型所做的编译器错误未实现
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+```
+
+#### 目录布局：
+
+https://access.redhat.com/documentation/zh-cn/openshift_container_platform/4.7/html/operators/go-based-operators
+```
+docker rm `docker ps -a -q`
+docker rmi hadoop:v3.3.1
+
+docker build -f Dockerfile-Hadoop -t hadoop:v3.3.1   .
 ```

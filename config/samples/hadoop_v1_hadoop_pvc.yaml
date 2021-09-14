@@ -10,9 +10,6 @@ spec:
     tag: 3.2.2-nolib
     pullPolicy: IfNotPresent
 
-  # The version of the hadoop libraries being used in the image.
-  hadoopVersion: 3.2.2
-
   # Select antiAffinity as either hard or soft, default is soft
   antiAffinity: "soft"
 

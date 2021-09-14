@@ -19,7 +19,6 @@ package hadoop
 import (
 	"context"
 	"github.com/HenryGits/hadoop-operator/controllers/tools"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/json"
@@ -159,11 +158,11 @@ func (r *HadoopReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		// 正在删除对象
 		if tools.ContainsString(origin.GetFinalizers(), Finalizer) {
 			// our finalizer is present, so lets handle any external dependency
-			if err := r.deleteExternalResources(ctx, origin); err != nil {
-				// if fail to delete the external dependency here, return with error
-				// so that it can be retried
-				return ctrl.Result{}, err
-			}
+			//if err := r.deleteExternalResources(ctx, origin); err != nil {
+			//	// if fail to delete the external dependency here, return with error
+			//	// so that it can be retried
+			//	return ctrl.Result{}, err
+			//}
 
 			// remove our finalizer from the list and update it.
 			controllerutil.RemoveFinalizer(origin, Finalizer)
@@ -197,49 +196,49 @@ func (r *HadoopReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r *HadoopReconciler) deleteExternalResources(ctx context.Context, hadoop *hadoopv1.Hadoop) error {
-	//
-	// delete any external resources associated with the cronJob
-	//
-	// Ensure that delete implementation is idempotent and safe to invoke
-	// multiple times for same object.
-
-	// volumeClaimTemplates 声明的存储不能主动删除，需要手动删除
-	if hadoop.Spec.Persistence.DataNode.Enabled {
-		name := hadoop.ObjectMeta.Name
-		//
-		//pvcList := &corev1.PersistentVolumeClaimList{}
-		//listOpts := []client.ListOption{
-		//	client.InNamespace(hadoop.Namespace),
-		//	client.MatchingLabels(map[string]string{
-		//		"app":       "hadoop",
-		//		"component": "hdfs-dn",
-		//		"release":   ReleasePrefix + name,
-		//	}),
-		//}
-		//if err := r.List(ctx, pvcList, listOpts...); err != nil {
-		//	klog.Errorf("get pvc of hadoop datanode %s error: %v", name, err)
-		//	return err
-		//}
-
-		pvc := &corev1.PersistentVolumeClaim{}
-		opts := []client.DeleteAllOfOption{
-			client.InNamespace(hadoop.Namespace),
-			client.MatchingLabels{
-				"app":       "hadoop",
-				"component": "hdfs-dn",
-				"release":   ReleasePrefix + name,
-			},
-			client.GracePeriodSeconds(5),
-		}
-		if err := r.DeleteAllOf(ctx, pvc, opts...); err != nil {
-			klog.Errorf("delete pvc of hadoop datanode %s error: %v", name, err)
-			return err
-		}
-	}
-
-	return nil
-}
+//func (r *HadoopReconciler) deleteExternalResources(ctx context.Context, hadoop *hadoopv1.Hadoop) error {
+//	//
+//	// delete any external resources associated with the cronJob
+//	//
+//	// Ensure that delete implementation is idempotent and safe to invoke
+//	// multiple times for same object.
+//
+//	// volumeClaimTemplates 声明的存储不能主动删除，需要手动删除
+//	if hadoop.Spec.Persistence.DataNode.Enabled {
+//		name := hadoop.ObjectMeta.Name
+//		//
+//		//pvcList := &corev1.PersistentVolumeClaimList{}
+//		//listOpts := []client.ListOption{
+//		//	client.InNamespace(hadoop.Namespace),
+//		//	client.MatchingLabels(map[string]string{
+//		//		"app":       "hadoop",
+//		//		"component": "hdfs-dn",
+//		//		"release":   ReleasePrefix + name,
+//		//	}),
+//		//}
+//		//if err := r.List(ctx, pvcList, listOpts...); err != nil {
+//		//	klog.Errorf("get pvc of hadoop datanode %s error: %v", name, err)
+//		//	return err
+//		//}
+//
+//		pvc := &corev1.PersistentVolumeClaim{}
+//		opts := []client.DeleteAllOfOption{
+//			client.InNamespace(hadoop.Namespace),
+//			client.MatchingLabels{
+//				"app":       "hadoop",
+//				"component": "hdfs-dn",
+//				"release":   ReleasePrefix + name,
+//			},
+//			client.GracePeriodSeconds(5),
+//		}
+//		if err := r.DeleteAllOf(ctx, pvc, opts...); err != nil {
+//			klog.Errorf("delete pvc of hadoop datanode %s error: %v", name, err)
+//			return err
+//		}
+//	}
+//
+//	return nil
+//}
 
 func (r *HadoopReconciler) generateRuntimeObjects(hadoop *hadoopv1.Hadoop) (runtimeObjects []*runtime.Object, err error) {
 	templates, err := HadoopTpl.ParseTemplate("hadoop.dameng.com_hadoop.gotmpl", hadoop)

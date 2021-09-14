@@ -1,0 +1,78 @@
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: hadoop-nn
+  namespace: system
+  labels:
+    app: hadoop-nn
+spec:
+  selector:
+    matchLabels:
+      app: hadoop-nn
+  template:
+    metadata:
+      labels:
+        app: hadoop-nn
+    spec:
+      serviceAccountName: hadoop-nn-admin
+      containers:
+        - image: "nginx:latest"
+          imagePullPolicy: "IfNotPresent"
+          name: provisioner
+          securityContext:
+            privileged: true
+          env:
+          - name: MY_NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
+          volumeMounts:
+#            - name: provisioner-config
+#              mountPath: /etc/provisioner/config
+#              readOnly: true
+            - name: nn-dir
+              mountPath: /home/nn
+              mountPropagation: "HostToContainer"
+      volumes:
+#        - name: provisioner-config
+#          configMap:
+#            name: local-provisioner-config
+        - name: nn-dir
+          hostPath:
+            # Ensure the file directory is created.
+            path: /home/data
+            type: DirectoryOrCreate
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: hadoop-nn-admin
+  namespace: system
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: hadoop-nn-clusterrole
+  namespace: system
+rules:
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["get"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: hadoop-nn-binding
+  namespace: system
+subjects:
+- kind: ServiceAccount
+  name: hadoop-nn-admin
+  namespace: system
+roleRef:
+  kind: ClusterRole
+  name: hadoop-nn-clusterrole
+  apiGroup: rbac.authorization.k8s.io
