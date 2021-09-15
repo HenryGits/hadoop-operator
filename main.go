@@ -70,9 +70,8 @@ func main() {
 		MetricsBindAddress:     metricsAddr,
 		Port:                   9443,
 		HealthProbeBindAddress: probeAddr,
-		// 领导选举（Leader-for-life or Leader-with-lease）
-		LeaderElection:   enableLeaderElection,
-		LeaderElectionID: "9e2207c6.dameng.com",
+		LeaderElection:         enableLeaderElection,
+		LeaderElectionID:       "9e2207c6.dameng.com",
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
