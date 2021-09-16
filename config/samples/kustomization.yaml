@@ -1,4 +1,4 @@
 ## Append samples you want in your CSV to this file as resources ##
 resources:
-- hadoop_v1_hadoop.yaml
+- hadoop_v1_nn.yaml
 #+kubebuilder:scaffold:manifestskustomizesamples

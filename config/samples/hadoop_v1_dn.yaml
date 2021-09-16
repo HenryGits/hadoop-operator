@@ -1,0 +1,51 @@
+apiVersion: hadoop.dameng.com/v1
+kind: Hadoop
+metadata:
+  name: hadoop-nn
+  namespace: system
+spec:
+  id: "id"
+  title: "title"
+  describe: "describe"
+  hdfs:
+    type: DataNode
+    daemonSet:
+      template:
+        spec:
+          serviceAccountName: controller-manager
+          containers:
+            - image: "hadoop:v3.3.1"
+              imagePullPolicy: "IfNotPresent"
+              name: provisioner
+              securityContext:
+                privileged: true
+              env:
+              - name: MY_NODE_NAME
+                valueFrom:
+                  fieldRef:
+                    fieldPath: spec.nodeName
+              volumeMounts:
+    #            - name: provisioner-config
+    #              mountPath: /etc/provisioner/config
+    #              readOnly: true
+                - name: nn-dir
+                  mountPath: /usr/local/hadoop/dn
+                  mountPropagation: "HostToContainer"
+              resources:
+                requests:
+                  memory: "256Mi"
+                  cpu: "100m"
+                limits:
+                  memory: "2048Mi"
+                  cpu: "1000m"
+          volumes:
+    #        - name: provisioner-config
+    #          configMap:
+    #            name: local-provisioner-config
+            - name: nn-dir
+              hostPath:
+                # Ensure the file directory is created.
+                path: /home/data/dn
+                type: DirectoryOrCreate
+  webHdfs:
+    enabled: true

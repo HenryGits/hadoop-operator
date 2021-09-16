@@ -3,6 +3,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: hadoop-viewer-role
+  namespace: system
 rules:
 - apiGroups:
   - hadoop.dameng.com

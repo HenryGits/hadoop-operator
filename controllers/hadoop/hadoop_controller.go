@@ -102,23 +102,16 @@ func (r *HadoopReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		}
 
 		// update hadoop nn&dn daemonSet
-		isOk, err := r.ensureDaemonSet(ctx, hadoop)
+		err := r.ensureDaemonSet(ctx, hadoop)
 		if err != nil {
 			logger.Error(err, "failed reconciling hadoop Master StatefulSet")
 			return ctrl.Result{}, err
 		}
-		if isOk {
-			logger.Info("hadoop daemonSet updated")
-			return ctrl.Result{Requeue: true}, nil
-		}
 		logger.Info("hadoop daemonSet is in sync")
 
-		serviceOk, err := r.ensureService(ctx, originHadoop)
+		err = r.ensureService(ctx, originHadoop)
 		if err != nil {
 			return ctrl.Result{}, err
-		}
-		if serviceOk {
-			return ctrl.Result{Requeue: true}, nil
 		}
 		logger.Info("hadoop headless service is in sync")
 
@@ -166,7 +159,7 @@ func (r *HadoopReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r *HadoopReconciler) ensureService(ctx context.Context, h *hadoopv1.Hadoop) (bool, error) {
+func (r *HadoopReconciler) ensureService(ctx context.Context, h *hadoopv1.Hadoop) error {
 	// create headless service if it doesn't exist
 	foundService := &corev1.Service{}
 	if err := r.Get(ctx, types.NamespacedName{
@@ -181,12 +174,12 @@ func (r *HadoopReconciler) ensureService(ctx context.Context, h *hadoopv1.Hadoop
 			//	return false, err
 			//}
 			klog.Info("created Hadoop Service")
-			return true, nil
+			return nil
 		}
 		klog.Error(err, "failed getting service")
-		return false, err
+		return err
 	}
-	return true, nil
+	return nil
 }
 
 /*
@@ -195,7 +188,7 @@ func (r *HadoopReconciler) ensureService(ctx context.Context, h *hadoopv1.Hadoop
 	@param: context.Context, *hadoopv1.Hadoop
 	@return: bool, error
 **/
-func (r *HadoopReconciler) ensureDaemonSet(ctx context.Context, h *hadoopv1.Hadoop) (bool, error) {
+func (r *HadoopReconciler) ensureDaemonSet(ctx context.Context, h *hadoopv1.Hadoop) error {
 	// create if it doesn't exist
 	ds := &appsv1.DaemonSet{}
 	if err := r.Get(ctx, types.NamespacedName{
@@ -204,19 +197,18 @@ func (r *HadoopReconciler) ensureDaemonSet(ctx context.Context, h *hadoopv1.Hado
 	}, ds); err != nil {
 		if errors.IsNotFound(err) {
 			ds := r.handleDs(h)
-			klog.Info("Hadoop DaemonSet Info: ", ds)
 
 			if err := r.Create(ctx, ds); err != nil {
 				klog.Error(err, "failed creating DaemonSet")
-				return false, err
+				return err
 			}
 			klog.Info("Created Hadoop DaemonSet Success")
-			return true, nil
+			return nil
 		}
 		klog.Error(err, "failed getting DaemonSet")
-		return false, err
+		return err
 	}
-	return true, nil
+	return nil
 }
 
 /*
@@ -226,33 +218,36 @@ func (r *HadoopReconciler) ensureDaemonSet(ctx context.Context, h *hadoopv1.Hado
 	@return: err error
 **/
 func (r *HadoopReconciler) handleDs(h *hadoopv1.Hadoop) *appsv1.DaemonSet {
-	hadoopDs := h.Spec.Hdfs.DaemonSet
-	dss := &appsv1.DaemonSetSpec{
-		Selector: hadoopDs.Selector,
+	hadoopDs := (&h.Spec.Hdfs.DaemonSet).DeepCopy()
+	dss := appsv1.DaemonSetSpec{
+		Selector: &metav1.LabelSelector{
+			MatchLabels: map[string]string{"app": h.Name},
+		},
 		Template: corev1.PodTemplateSpec{
 			ObjectMeta: metav1.ObjectMeta{
-				Labels:      hadoopDs.Template.Labels,
+				Name:        h.Name,
+				Labels:      map[string]string{"app": h.Name},
 				Annotations: hadoopDs.Template.Annotations,
 			},
 			Spec: hadoopDs.Template.Spec,
 		},
 	}
 
-	ds := &appsv1.DaemonSet{
+	ds := appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        h.Name,
 			Namespace:   h.Namespace,
 			Labels:      h.Labels,
 			Annotations: h.Annotations,
 		},
-		Spec: *dss,
+		Spec: dss,
 	}
-	err := controllerutil.SetControllerReference(h, ds, r.Scheme)
+	err := controllerutil.SetControllerReference(h, &ds, r.Scheme)
 	if err != nil {
 		klog.Errorf("nested spec error: %v", err)
 		return nil
 	}
-	return ds
+	return &ds
 }
 
 func setSpecAnnotation(object *unstructured.Unstructured) (*unstructured.Unstructured, error) {

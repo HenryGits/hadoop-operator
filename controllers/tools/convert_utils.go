@@ -18,3 +18,17 @@ func ParseInt(source string, base, bitSize int) int64 {
 		return result
 	}
 }
+
+// CloneMap clones a map and applies patches without overwrites
+func CloneMap(ms ...map[string]string) map[string]string {
+	a := map[string]string{}
+	for _, p := range ms {
+		for k, v := range p {
+			if _, ok := a[k]; ok {
+				continue
+			}
+			a[k] = v
+		}
+	}
+	return a
+}

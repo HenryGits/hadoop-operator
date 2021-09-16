@@ -118,7 +118,14 @@ type Hdfs struct {
 	// DaemonSet specifies the hadoop should be deployed as a DaemonSet, and allows providing its spec.
 	// Cannot be used along with `deployment`. If both are absent a default for the Type is used.
 	// +optional
-	DaemonSet *appsv1.DaemonSetSpec `json:"daemonSet,omitempty"`
+	DaemonSet DaemonSetSpec `json:"daemonSet,omitempty"`
+}
+
+type DaemonSetSpec struct {
+	// +optional
+	Template corev1.PodTemplateSpec `json:"template,omitempty"`
+	// +optional
+	UpdateStrategy appsv1.DaemonSetUpdateStrategy `json:"updateStrategy,omitempty"`
 }
 
 type WebHdfs struct {
