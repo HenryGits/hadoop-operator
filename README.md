@@ -83,12 +83,13 @@ source <(kubebuilder completion bash)
 
 https://access.redhat.com/documentation/zh-cn/openshift_container_platform/4.7/html/operators/go-based-operators
 ```
-docker rm `docker ps -a -q`
 docker rmi hadoop:v3.3.1
+docker rm `docker ps -a -q`
 # 删除为<none>的镜像
 docker rmi `docker images |awk  '{print $1,$3}'|grep none|awk  '{print $2}'`
 
 
 docker build -f Dockerfile-Hadoop -t hadoop:v3.3.1   .
+docker build -f Dockerfile -t hadoop:v3.3.1  --network host --build-arg HTTP_PROXY=http://192.168.101.88:3128 --build-arg HTTPS_PROXY=http://192.168.101.88:3128 .
 docker build -t controller:latest --network host --build-arg HTTP_PROXY=http://192.168.101.88:3128 --build-arg HTTPS_PROXY=http://192.168.101.88:3128 .
 ```

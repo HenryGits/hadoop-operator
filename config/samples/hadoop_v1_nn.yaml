@@ -16,14 +16,20 @@ spec:
           containers:
             - image: "hadoop:v3.3.1"
               imagePullPolicy: "IfNotPresent"
-              name: provisioner
+              name: hadoop-nn
+              args:
+                - "--nnDir=$(HDFS_NAME_NODE_DIR)"
+                - "--containerized"
+                - "--driver-name=csi.huawei.com"
               securityContext:
                 privileged: true
               env:
-              - name: MY_NODE_NAME
-                valueFrom:
-                  fieldRef:
-                    fieldPath: spec.nodeName
+                - name: MY_NODE_NAME
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: spec.nodeName
+                - name: HDFS_NAME_NODE_DIR
+                  value: "/usr/local/hadoop/nn"
               volumeMounts:
     #            - name: provisioner-config
     #              mountPath: /etc/provisioner/config
