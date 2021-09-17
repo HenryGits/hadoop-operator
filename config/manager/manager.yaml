@@ -53,5 +53,12 @@ spec:
           requests:
             cpu: 100m
             memory: 20Mi
+        volumeMounts:
+          - name: templates
+            mountPath: /etc/operator/templates
       serviceAccountName: controller-manager
       terminationGracePeriodSeconds: 10
+      volumes:
+          - name: templates
+            configMap:
+              name: manager-template

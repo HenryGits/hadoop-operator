@@ -1,78 +1,90 @@
 ---
-apiVersion: apps/v1
-kind: DaemonSet
+apiVersion: hadoop.dameng.com/v1
+kind: Hadoop
 metadata:
-  name: hadoop-nn
+  name: hadoop-sample
   namespace: system
-  labels:
-    app: hadoop-nn
 spec:
-  selector:
-    matchLabels:
-      app: hadoop-nn
-  template:
-    metadata:
-      labels:
-        app: hadoop-nn
-    spec:
-      serviceAccountName: hadoop-nn-admin
-      containers:
-        - image: "nginx:latest"
-          imagePullPolicy: "IfNotPresent"
-          name: provisioner
-          securityContext:
-            privileged: true
-          env:
-          - name: MY_NODE_NAME
-            valueFrom:
-              fieldRef:
-                fieldPath: spec.nodeName
-          volumeMounts:
-#            - name: provisioner-config
-#              mountPath: /etc/provisioner/config
-#              readOnly: true
-            - name: nn-dir
-              mountPath: /home/nn
-              mountPropagation: "HostToContainer"
-      volumes:
-#        - name: provisioner-config
-#          configMap:
-#            name: local-provisioner-config
-        - name: nn-dir
-          hostPath:
-            # Ensure the file directory is created.
-            path: /home/data
-            type: DirectoryOrCreate
-
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: hadoop-nn-admin
-  namespace: system
-
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: hadoop-nn-clusterrole
-  namespace: system
-rules:
-- apiGroups: [""]
-  resources: ["nodes"]
-  verbs: ["get"]
-
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: hadoop-nn-binding
-  namespace: system
-subjects:
-- kind: ServiceAccount
-  name: hadoop-nn-admin
-  namespace: system
-roleRef:
-  kind: ClusterRole
-  name: hadoop-nn-clusterrole
-  apiGroup: rbac.authorization.k8s.io
+  id: "id"
+  title: "title"
+  describe: "describe"
+  # The base hadoop image to use for all components.
+  # See this repo for image build details: https://github.com/chenseanxy/helm-hadoop-3/tree/master/image
+  image:
+    repository: hadoop
+    tag: v3.3.1
+    pullPolicy: IfNotPresent
+  hdfs:
+    nameNode:
+      pdbMinAvailable: 3
+      antiAffinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - topologyKey: "kubernetes.io/hostname"
+              labelSelector:
+                matchLabels:
+                  app: metadata.name
+                  release: metadata.name
+                  component: yarn-rm
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 5
+              podAffinityTerm:
+                topologyKey: "kubernetes.io/hostname"
+                labelSelector:
+                  matchLabels:
+                    app: metadata.name
+                    release: metadata.name
+      resources:
+        requests:
+          memory: "256Mi"
+          cpu: "100m"
+        limits:
+          memory: "2048Mi"
+          cpu: "1000m"
+    dataNode:
+      pdbMinAvailable: 3
+      resources:
+        requests:
+          memory: "256Mi"
+          cpu: "100m"
+        limits:
+          memory: "2048Mi"
+          cpu: "1000m"
+  webHdfs:
+    enabled: true
+  resourceManager:
+    pdbMinAvailable: 1
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "100m"
+      limits:
+        memory: "2048Mi"
+        cpu: "2000m"
+  nodeManager:
+    pdbMinAvailable: 1
+    # The number of YARN NodeManager instances.
+    replicas: 2
+    # Create statefulsets in parallel (K8S 1.7+)
+    parallelCreate: false
+    # CPU and memory resources allocated to each node manager pod.
+    # This should be tuned to fit your workload.
+    resources:
+      requests:
+        memory: "2048Mi"
+        cpu: "1000m"
+      limits:
+        memory: "2048Mi"
+        cpu: "1000m"
+  historyServer:
+    # Create statefulsets in parallel (K8S 1.7+)
+    parallelCreate: false
+    # CPU and memory resources allocated to each node manager pod.
+    # This should be tuned to fit your workload.
+    resources:
+      requests:
+        memory: "2048Mi"
+        cpu: "1000m"
+      limits:
+        memory: "2048Mi"
+        cpu: "1000m"

@@ -22,7 +22,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
@@ -45,7 +44,7 @@ const (
 )
 
 var HadoopTpl = tools.Parser{
-	Directory: tools.EnvVar("TEMPLATES_PATH", "/etc/operator/templates"),
+	Directory: tools.EnvVar("GT_TEMPLATE_PATH", "/etc/operator/templates"),
 	Pattern:   "\\.gotmpl$",
 }
 
@@ -64,13 +63,6 @@ type HadoopReconciler struct {
 //+kubebuilder:rbac:groups=policy,resources=poddisruptionbudgets,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=*
 
-// Reconcile is part of the main kubernetes reconciliation loop which aims to
-// move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the Hadoop object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
-//
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.9.2/pkg/reconcile
 func (r *HadoopReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -88,58 +80,103 @@ func (r *HadoopReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	hadoop := originHadoop.DeepCopy()
 	hadoop.Status.Phase = hadoopv1.Reconciling
 
-	// 检查 DeletionTimestamp 以确定对象是否正在删除
-	if originHadoop.ObjectMeta.DeletionTimestamp.IsZero() {
+	// examine DeletionTimestamp to determine if object is under deletion
+	if hadoop.ObjectMeta.DeletionTimestamp.IsZero() {
 		// The object is not being deleted, so if it does not have our finalizer,
 		// then lets add the finalizer and update the object. This is equivalent
 		// registering our finalizer.
-		if !tools.ContainsString(originHadoop.GetFinalizers(), Finalizer) {
-			controllerutil.AddFinalizer(originHadoop, Finalizer)
-			if err := r.Update(ctx, originHadoop); err != nil {
+		if !tools.ContainsString(hadoop.GetFinalizers(), Finalizer) {
+			controllerutil.AddFinalizer(hadoop, Finalizer)
+			if err := r.Update(ctx, hadoop); err != nil {
 				logger.Error(err, "unable to update hadoop")
 				return ctrl.Result{}, err
 			}
 		}
 
-		// update hadoop nn&dn daemonSet
-		err := r.ensureDaemonSet(ctx, hadoop)
+		runtimeObjects, err := r.generateRuntimeObjects(hadoop)
 		if err != nil {
-			logger.Error(err, "failed reconciling hadoop Master StatefulSet")
+			logger.Error(err, "decode error")
 			return ctrl.Result{}, err
 		}
-		logger.Info("hadoop daemonSet is in sync")
 
-		err = r.ensureService(ctx, originHadoop)
-		if err != nil {
-			return ctrl.Result{}, err
+		for _, object := range runtimeObjects {
+			// set spec annotation
+			object, err := setSpecAnnotation((*object).(*unstructured.Unstructured))
+			if err != nil {
+				logger.Error(err, "set annotation error")
+				return ctrl.Result{}, err
+			}
+			// set namespace
+			object.SetNamespace(hadoop.Namespace)
+			// set controller reference
+			if err := controllerutil.SetControllerReference(hadoop, object, r.Scheme); err != nil {
+				logger.Error(err, "maintain hadoop controller reference error")
+				return ctrl.Result{}, err
+			}
+
+			logger.V(6).Info("object content:", "object", object)
+
+			// retrieve origin
+			var originObject unstructured.Unstructured
+			originObject.SetGroupVersionKind(object.GroupVersionKind())
+			if err := r.Get(ctx, client.ObjectKey{Namespace: hadoop.Namespace, Name: object.GetName()}, &originObject); err != nil {
+				// create object if not found
+				if errors.IsNotFound(err) {
+					if err := r.Create(ctx, object, &client.CreateOptions{FieldManager: FieldManager}); err != nil {
+						logger.Error(err, "Object create error", "Object", object)
+
+						return ctrl.Result{}, err
+					}
+				} else {
+					logger.Error(err, "get origin Object error")
+					return ctrl.Result{}, err
+				}
+			} else {
+				// continue if origin equal new
+				equal, err := objectEqual(&originObject, object)
+				if err != nil {
+					logger.Error(err, "Object equal error")
+					return ctrl.Result{}, err
+				}
+				logger.V(4).Info("deep equal", "kind", object.GroupVersionKind(), "result", equal)
+				if equal {
+					continue
+				}
+
+				// patch if origin not equal new
+				if err := r.Patch(ctx, object, client.Merge, &client.PatchOptions{FieldManager: FieldManager}); err != nil {
+					logger.Error(err, "Object patch error", "Object", object)
+
+					return ctrl.Result{}, err
+				}
+			}
 		}
-		logger.Info("hadoop headless service is in sync")
-
 	} else {
-		// 正在删除对象
-		if tools.ContainsString(originHadoop.GetFinalizers(), Finalizer) {
+		// The object is being deleted
+		if tools.ContainsString(hadoop.GetFinalizers(), Finalizer) {
 			// our finalizer is present, so lets handle any external dependency
-			//if err := r.deleteExternalResources(ctx, originHadoop); err != nil {
+			//if err := r.deleteExternalResources(ctx, hadoop); err != nil {
 			//	// if fail to delete the external dependency here, return with error
 			//	// so that it can be retried
 			//	return ctrl.Result{}, err
 			//}
+
 			// remove our finalizer from the list and update it.
-			controllerutil.RemoveFinalizer(originHadoop, Finalizer)
-			if err := r.Update(ctx, originHadoop); err != nil {
+			controllerutil.RemoveFinalizer(hadoop, Finalizer)
+			if err := r.Update(ctx, hadoop); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
 	}
 
-	if !reflect.DeepEqual(hadoop.TypeMeta, originHadoop.TypeMeta) || !reflect.DeepEqual(hadoop.ObjectMeta, originHadoop.ObjectMeta) || !reflect.DeepEqual(hadoop.Spec, originHadoop.Spec) {
+	if !reflect.DeepEqual(hadoop.TypeMeta, hadoop.TypeMeta) || !reflect.DeepEqual(hadoop.ObjectMeta, hadoop.ObjectMeta) || !reflect.DeepEqual(hadoop.Spec, hadoop.Spec) {
 		if err := r.Update(ctx, hadoop); err != nil {
 			logger.Error(err, "update without status error")
 			return ctrl.Result{}, err
 		}
 	}
 
-	if !reflect.DeepEqual(hadoop.Status, originHadoop.Status) {
+	if !reflect.DeepEqual(hadoop.Status, hadoop.Status) {
 		if err := r.Status().Update(ctx, hadoop); err != nil {
 			logger.Error(err, "update status error")
 			return ctrl.Result{}, err
@@ -157,6 +194,16 @@ func (r *HadoopReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&appsv1.StatefulSet{}).
 		Owns(&appsv1.DaemonSet{}).
 		Complete(r)
+}
+
+func (r *HadoopReconciler) generateRuntimeObjects(hadoop *hadoopv1.Hadoop) (runtimeObjects []*runtime.Object, err error) {
+	templates, err := HadoopTpl.ParseTemplate("hadoop.dameng.com_hadoop.gotmpl", hadoop)
+	if err != nil {
+		klog.Errorf("generate hadoop runtime error: %v", err)
+		return runtimeObjects, err
+	}
+	klog.V(8).Infof("template: %s", templates)
+	return tools.ParseYaml(templates)
 }
 
 func (r *HadoopReconciler) ensureService(ctx context.Context, h *hadoopv1.Hadoop) error {
@@ -182,74 +229,6 @@ func (r *HadoopReconciler) ensureService(ctx context.Context, h *hadoopv1.Hadoop
 	return nil
 }
 
-/*
-	@title    ensureDaemonSet
-	@description	确保守护进程集正常
-	@param: context.Context, *hadoopv1.Hadoop
-	@return: bool, error
-**/
-func (r *HadoopReconciler) ensureDaemonSet(ctx context.Context, h *hadoopv1.Hadoop) error {
-	// create if it doesn't exist
-	ds := &appsv1.DaemonSet{}
-	if err := r.Get(ctx, types.NamespacedName{
-		Name:      h.Name,
-		Namespace: h.Namespace,
-	}, ds); err != nil {
-		if errors.IsNotFound(err) {
-			ds := r.handleDs(h)
-
-			if err := r.Create(ctx, ds); err != nil {
-				klog.Error(err, "failed creating DaemonSet")
-				return err
-			}
-			klog.Info("Created Hadoop DaemonSet Success")
-			return nil
-		}
-		klog.Error(err, "failed getting DaemonSet")
-		return err
-	}
-	return nil
-}
-
-/*
-	@title    handleDs
-	@description	处理ds
-	@param: []string
-	@return: err error
-**/
-func (r *HadoopReconciler) handleDs(h *hadoopv1.Hadoop) *appsv1.DaemonSet {
-	hadoopDs := (&h.Spec.Hdfs.DaemonSet).DeepCopy()
-	dss := appsv1.DaemonSetSpec{
-		Selector: &metav1.LabelSelector{
-			MatchLabels: map[string]string{"app": h.Name},
-		},
-		Template: corev1.PodTemplateSpec{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:        h.Name,
-				Labels:      map[string]string{"app": h.Name},
-				Annotations: hadoopDs.Template.Annotations,
-			},
-			Spec: hadoopDs.Template.Spec,
-		},
-	}
-
-	ds := appsv1.DaemonSet{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        h.Name,
-			Namespace:   h.Namespace,
-			Labels:      h.Labels,
-			Annotations: h.Annotations,
-		},
-		Spec: dss,
-	}
-	err := controllerutil.SetControllerReference(h, &ds, r.Scheme)
-	if err != nil {
-		klog.Errorf("nested spec error: %v", err)
-		return nil
-	}
-	return &ds
-}
-
 func setSpecAnnotation(object *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 	spec, found, err := unstructured.NestedFieldNoCopy(object.Object, "spec")
 	if err != nil {
@@ -273,7 +252,7 @@ func setSpecAnnotation(object *unstructured.Unstructured) (*unstructured.Unstruc
 	return object, nil
 }
 
-func objectEqual(originHadoop, newer *unstructured.Unstructured) (bool, error) {
+func objectEqual(hadoop, newer *unstructured.Unstructured) (bool, error) {
 	newSpec, found, err := unstructured.NestedFieldNoCopy(newer.Object, "spec")
 	if err != nil {
 		klog.Errorf("nested spec error: %v", err)
@@ -283,12 +262,12 @@ func objectEqual(originHadoop, newer *unstructured.Unstructured) (bool, error) {
 		return false, nil
 	}
 
-	originSpecJSON, ok := originHadoop.GetAnnotations()["operator.dameng.com/spec"]
+	originSpecJSON, ok := hadoop.GetAnnotations()["operator.dameng.com/spec"]
 	if !ok {
 		return false, nil
 	}
 
-	klog.V(6).Infof("originHadoop spec json: %v", originSpecJSON)
+	klog.V(6).Infof("hadoop spec json: %v", originSpecJSON)
 
 	var originSpec map[string]interface{}
 	if err := json.Unmarshal([]byte(originSpecJSON), &originSpec); err != nil {

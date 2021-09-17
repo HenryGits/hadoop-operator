@@ -17,7 +17,6 @@ limitations under the License.
 package v1
 
 import (
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -61,6 +60,8 @@ type HadoopSpec struct {
 	// Describe is the description of the hadoop release
 	// +optional
 	Describe string `json:"describe,omitempty"`
+	// +optional
+	Image Image `json:"image,omitempty"`
 
 	// +optional
 	Hdfs    *Hdfs    `json:"hdfs,omitempty"`
@@ -112,20 +113,44 @@ type Image struct {
 
 // Hdfs  Hadoop nn & dn
 type Hdfs struct {
-	// +optional
-	// +kubebuilder:validation:Enum={NameNode,DataNode}
-	Type string `json:"type,omitempty"`
-	// DaemonSet specifies the hadoop should be deployed as a DaemonSet, and allows providing its spec.
-	// Cannot be used along with `deployment`. If both are absent a default for the Type is used.
-	// +optional
-	DaemonSet DaemonSetSpec `json:"daemonSet,omitempty"`
+	NameNode *NameNode `json:"nameNode,omitempty"`
+	DataNode *DataNode `json:"dataNode,omitempty"`
 }
 
-type DaemonSetSpec struct {
+type NameNode struct {
+	// PdbMinAvailable is the minimum available number of PodDisruptionBudget for Hadoop component
 	// +optional
-	Template corev1.PodTemplateSpec `json:"template,omitempty"`
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:default=1
+	PdbMinAvailable *int32 `json:"pdbMinAvailable,omitempty"`
+	// Resources is the CPU and memory resource (requests and limits) allocated to each Hadoop component pod.
+	// This should be tuned to fit your workload.
 	// +optional
-	UpdateStrategy appsv1.DaemonSetUpdateStrategy `json:"updateStrategy,omitempty"`
+	// +kubebuilder:default:={requests: {cpu: "100m", memory: "256Mi"}, limits: {cpu: "500m", memory: "1Gi"}}
+	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
+	// 反亲和
+	// +optional
+	AntiAffinity corev1.Affinity `json:"antiAffinity,omitempty"`
+}
+
+type DataNode struct {
+	// Replicas is the pod number of Hadoop component.
+	// +optional
+	// +kubebuilder:default:=3
+	Replicas *int32 `json:"replicas,omitempty"`
+	// PdbMinAvailable is the minimum available number of PodDisruptionBudget for Hadoop component
+	// +optional
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:default=1
+	PdbMinAvailable *int32 `json:"pdbMinAvailable,omitempty"`
+	// Resources is the CPU and memory resource (requests and limits) allocated to each Hadoop component pod.
+	// This should be tuned to fit your workload.
+	// +optional
+	// +kubebuilder:default:={requests: {cpu: "100m", memory: "256Mi"}, limits: {cpu: "500m", memory: "1Gi"}}
+	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
+	// 反亲和
+	// +optional
+	AntiAffinity corev1.Affinity `json:"antiAffinity,omitempty"`
 }
 
 type WebHdfs struct {
@@ -146,7 +171,7 @@ type ResourceManager struct {
 	// This should be tuned to fit your workload.
 	// +optional
 	// +kubebuilder:default:={requests: {cpu: "100m", memory: "256Mi"}, limits: {cpu: "500m", memory: "1Gi"}}
-	Resources *ResourceRequirements `json:"resources,omitempty"`
+	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 type NodeManager struct {
@@ -163,7 +188,7 @@ type NodeManager struct {
 	// This should be tuned to fit your workload.
 	// +optional
 	// +kubebuilder:default:={requests: {cpu: "100m", memory: "256Mi"}, limits: {cpu: "500m", memory: "1Gi"}}
-	Resources *ResourceRequirements `json:"resources,omitempty"`
+	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 	// ParallelCreate is whether to create all nodeManager statefulset pods in parallel or not (K8S 1.7+)
 	// +optional
 	// +kubebuilder:validation:Enum={true,false}
@@ -176,29 +201,10 @@ type HistoryServer struct {
 	// This should be tuned to fit your workload.
 	// +optional
 	// +kubebuilder:default:={requests: {cpu: "100m", memory: "256Mi"}, limits: {cpu: "500m", memory: "1Gi"}}
-	Resources *ResourceRequirements `json:"resources,omitempty"`
+	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 	// ParallelCreate is whether to create all nodeManager statefulset pods in parallel or not (K8S 1.7+)
 	// +optional
 	// +kubebuilder:validation:Enum={true,false}
 	// +kubebuilder:default=true
 	ParallelCreate bool `json:"parallelCreate,omitempty"`
-}
-
-// ResourceRequirements describes the compute resource requirements.
-type ResourceRequirements struct {
-	// Limits describes the maximum amount of compute resources allowed.
-	// More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
-	// +optional
-	Limits ResourceList `json:"limits,omitempty"`
-	// Requests describes the minimum amount of compute resources required.
-	// If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
-	// otherwise to an implementation-defined value.
-	// More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
-	// +optional
-	Requests ResourceList `json:"requests,omitempty"`
-}
-
-type ResourceList struct {
-	Cpu    string `json:"cpu,omitempty"`
-	Memory string `json:"memory,omitempty"`
 }
