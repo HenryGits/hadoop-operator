@@ -11,6 +11,7 @@ import (
 	v12 "github.com/HenryGits/hadoop-operator/controllers/typed/v1"
 	"github.com/fatih/structs"
 	"gopkg.in/yaml.v2"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 	"path"
@@ -290,38 +291,35 @@ hostAliases:
 	return strings.TrimSpace(result)
 }
 
+//TODO: 此处做转换
 // ParseResources 解析Resource
-func ParseResources(memory, cpu *v12.Resource) string {
-	if memory == nil && cpu == nil {
+func ParseResources(r *corev1.ResourceRequirements) string {
+	if r == nil {
 		return ""
 	}
-	resources := struct {
-		Memory *v12.Resource
-		CPU    *v12.Resource
-	}{
-		Memory: memory,
-		CPU:    cpu,
-	}
+
+	cpu := r.Limits.Cpu()
+	println(cpu.Value())
 
 	tmpl := `
 resources:
   limits:
 {{- with .Memory }}
-    memory: {{ .Limits }}Gi
+    memory: {{ .Limits }}
 {{- end }}
 {{- with .CPU }}
     cpu: {{ .Limits }}
 {{- end }}
   requests:
 {{- with .Memory }}
-    memory: {{ if .IsShare }}{{ cat .Requests }}{{ else }}{{ cat .Limits }}{{ end }}Gi
+    memory: {{ .Requests }}
 {{- end }}
 {{- with .CPU }}
-    cpu: {{ if .IsShare }}{{ .Requests }}{{ else }}{{ .Limits }}{{ end }}
+    cpu: {{ .Requests }}{{ .Limits }}
 {{- end }}
 `
 
-	result, _ := defaultParser.ParseString(tmpl, resources)
+	result, _ := defaultParser.ParseString(tmpl, r)
 	return strings.TrimSpace(result)
 }
 
@@ -1126,7 +1124,8 @@ func KubernetesConfHelper(object interface{}) (conf KubernetesConf) {
 	conf.Environments = ParseEnvironments(environments)
 	klog.V(5).InfoS(fmt.Sprintf("template helper: %s", lastName), "Environments", conf.Environments)
 
-	conf.Resources = ParseResources(memory, cpu)
+	rs := fields.FieldByName("Resources").Interface().(*corev1.ResourceRequirements)
+	conf.Resources = ParseResources(rs)
 	klog.V(5).InfoS(fmt.Sprintf("template helper: %s", lastName), "Resources", conf.Resources)
 
 	conf.Lifecycle = ParseLifecycle(terminator)

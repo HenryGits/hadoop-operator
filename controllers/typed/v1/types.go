@@ -93,9 +93,9 @@ type HostAlias struct {
 }
 
 type Resource struct {
-	IsShare  bool   `json:"isShare,omitempty"`
-	Requests string `json:"requests,omitempty"`
-	Limits   string `json:"limits,omitempty"`
+	//IsShare  bool                `json:"isShare,omitempty"`
+	Requests corev1.ResourceList `json:"requests,omitempty"`
+	Limits   corev1.ResourceList `json:"limits,omitempty"`
 }
 
 type Configuration struct {

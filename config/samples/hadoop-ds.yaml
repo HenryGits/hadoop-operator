@@ -10,46 +10,28 @@ spec:
   describe: "describe"
   # The base hadoop image to use for all components.
   # See this repo for image build details: https://github.com/chenseanxy/helm-hadoop-3/tree/master/image
-  image:
-    repository: hadoop
-    tag: v3.3.1
+  container:
+    image: hadoop:v3.3.1
     pullPolicy: IfNotPresent
   hdfs:
     nameNode:
       pdbMinAvailable: 3
-      antiAffinity:
-        podAntiAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            - topologyKey: "kubernetes.io/hostname"
-              labelSelector:
-                matchLabels:
-                  app: metadata.name
-                  release: metadata.name
-                  component: yarn-rm
-          preferredDuringSchedulingIgnoredDuringExecution:
-            - weight: 5
-              podAffinityTerm:
-                topologyKey: "kubernetes.io/hostname"
-                labelSelector:
-                  matchLabels:
-                    app: metadata.name
-                    release: metadata.name
       resources:
         requests:
           memory: "256Mi"
-          cpu: "100m"
+          cpu:  "100m"
         limits:
           memory: "2048Mi"
-          cpu: "1000m"
+          cpu:  "1000m"
     dataNode:
       pdbMinAvailable: 3
       resources:
         requests:
           memory: "256Mi"
-          cpu: "100m"
+          cpu:  "100m"
         limits:
           memory: "2048Mi"
-          cpu: "1000m"
+          cpu:  "1000m"
   webHdfs:
     enabled: true
   resourceManager:
@@ -63,12 +45,7 @@ spec:
         cpu: "2000m"
   nodeManager:
     pdbMinAvailable: 1
-    # The number of YARN NodeManager instances.
-    replicas: 2
-    # Create statefulsets in parallel (K8S 1.7+)
     parallelCreate: false
-    # CPU and memory resources allocated to each node manager pod.
-    # This should be tuned to fit your workload.
     resources:
       requests:
         memory: "2048Mi"
@@ -77,10 +54,7 @@ spec:
         memory: "2048Mi"
         cpu: "1000m"
   historyServer:
-    # Create statefulsets in parallel (K8S 1.7+)
     parallelCreate: false
-    # CPU and memory resources allocated to each node manager pod.
-    # This should be tuned to fit your workload.
     resources:
       requests:
         memory: "2048Mi"

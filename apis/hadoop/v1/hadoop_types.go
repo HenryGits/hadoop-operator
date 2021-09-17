@@ -61,7 +61,7 @@ type HadoopSpec struct {
 	// +optional
 	Describe string `json:"describe,omitempty"`
 	// +optional
-	Image Image `json:"image,omitempty"`
+	Container Container `json:"container,omitempty"`
 
 	// +optional
 	Hdfs    *Hdfs    `json:"hdfs,omitempty"`
@@ -95,15 +95,10 @@ func init() {
 	SchemeBuilder.Register(&Hadoop{}, &HadoopList{})
 }
 
-type Image struct {
-	// Repository is Hadoop image repository
+type Container struct {
 	// +optional
-	// +kubebuilder:default="hadoop"
-	Repository string `json:"repository,omitempty"`
-	// Tag is the Hadoop image tag
-	// +optional
-	// +kubebuilder:default="v3.3.1"
-	Tag string `json:"tag,omitempty"`
+	// +kubebuilder:default="hadoop:v3.3.1"
+	Image string `json:"image,omitempty"`
 	// PullPolicy is the pull policy for the images
 	// +optional
 	// +kubebuilder:validation:Enum={Always,Never,IfNotPresent}
@@ -130,14 +125,10 @@ type NameNode struct {
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 	// 反亲和
 	// +optional
-	AntiAffinity corev1.Affinity `json:"antiAffinity,omitempty"`
+	AntiAffinity corev1.Affinity `json:"affinity,omitempty"`
 }
 
 type DataNode struct {
-	// Replicas is the pod number of Hadoop component.
-	// +optional
-	// +kubebuilder:default:=3
-	Replicas *int32 `json:"replicas,omitempty"`
 	// PdbMinAvailable is the minimum available number of PodDisruptionBudget for Hadoop component
 	// +optional
 	// +kubebuilder:validation:Minimum=1
@@ -150,7 +141,7 @@ type DataNode struct {
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 	// 反亲和
 	// +optional
-	AntiAffinity corev1.Affinity `json:"antiAffinity,omitempty"`
+	AntiAffinity corev1.Affinity `json:"affinity,omitempty"`
 }
 
 type WebHdfs struct {
@@ -175,10 +166,6 @@ type ResourceManager struct {
 }
 
 type NodeManager struct {
-	// Replicas is the pod number of Hadoop component.
-	// +optional
-	// +kubebuilder:default:=1
-	Replicas *int32 `json:"replicas,omitempty"`
 	// PdbMinAvailable is the minimum available number of PodDisruptionBudget for Hadoop component
 	// +optional
 	// +kubebuilder:validation:Minimum=1

@@ -45,9 +45,9 @@ spec:
                   memory: "2048Mi"
                   cpu: "1000m"
           volumes:
-    #        - name: provisioner-config
-    #          configMap:
-    #            name: local-provisioner-config
+            - name: nn-config
+              configMap:
+                name: nn-config
             - name: nn-dir
               hostPath:
                 # Ensure the file directory is created.
