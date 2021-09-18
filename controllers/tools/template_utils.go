@@ -8,10 +8,9 @@ package tools
 import (
 	"encoding/json"
 	"fmt"
-	v12 "github.com/HenryGits/hadoop-operator/controllers/typed/v1"
+	"github.com/HenryGits/hadoop-operator/apis/hadoop/v1"
 	"github.com/fatih/structs"
 	"gopkg.in/yaml.v2"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 	"path"
@@ -144,7 +143,7 @@ env:
 }
 
 // ParsePersistentVolumeClaim 解析存储卷
-func ParsePersistentVolumeClaim(volumes []*v12.Volume, replicas int64, lastName, id string) (pvcs []string) {
+func ParsePersistentVolumeClaim(volumes []*v1.Volume, replicas int64, lastName, id string) (pvcs []string) {
 	if len(volumes) < 1 {
 		return
 	}
@@ -171,7 +170,7 @@ spec:
 `
 
 	for _, volume := range volumes {
-		if volume.Type == v12.PersistentVolumeClaim {
+		if volume.Type == v1.PersistentVolumeClaim {
 			parameters := map[string]interface{}{
 				"Replicas": replicas,
 				"Volume":   volume,
@@ -184,7 +183,7 @@ spec:
 }
 
 // ParseService 解析Service对象
-func ParseService(service *v12.Service, ip string, id string) string {
+func ParseService(service *v1.Service, ip string, id string) string {
 	if service == nil {
 		return ""
 	}
@@ -217,7 +216,7 @@ spec:
 	return strings.TrimSpace(result)
 }
 
-func ParsePodPort(service *v12.Service) string {
+func ParsePodPort(service *v1.Service) string {
 	if service == nil {
 		return ""
 	}
@@ -238,7 +237,7 @@ ports:
 }
 
 // ParseExporter 解析Prometheus注解
-func ParseExporter(exporter *v12.Exporter) string {
+func ParseExporter(exporter *v1.Exporter) string {
 	if exporter == nil {
 		return ""
 	}
@@ -254,7 +253,7 @@ prometheus.io/port: {{ default "9100" .Port | quote }}
 }
 
 // ParseNodeSelector 解析NodeSelector
-func ParseNodeSelector(labels []*v12.Label) string {
+func ParseNodeSelector(labels []*v1.Label) string {
 	if len(labels) < 1 {
 		return ""
 	}
@@ -271,7 +270,7 @@ nodeSelector:
 }
 
 // ParseHostAliases 解析HostAlias
-func ParseHostAliases(hostAliases []*v12.HostAlias) string {
+func ParseHostAliases(hostAliases []*v1.HostAlias) string {
 	if len(hostAliases) < 1 {
 		return ""
 	}
@@ -291,32 +290,32 @@ hostAliases:
 	return strings.TrimSpace(result)
 }
 
-//TODO: 此处做转换
 // ParseResources 解析Resource
-func ParseResources(r *corev1.ResourceRequirements) string {
+func ParseResources(r *v1.Resources) string {
 	if r == nil {
 		return ""
 	}
 
-	cpu := r.Limits.Cpu()
-	println(cpu.Value())
-
 	tmpl := `
 resources:
   limits:
-{{- with .Memory }}
-    memory: {{ .Limits }}
+{{- range $i, $v := .Limits}}
+{{- if eq $i "memory"}}
+    memory: {{ $v | quote  }}
 {{- end }}
-{{- with .CPU }}
-    cpu: {{ .Limits }}
-{{- end }}
+{{- if eq $i "cpu"}}
+    cpu: {{ $v | quote  }}
+{{- end}}
+{{- end}}
   requests:
-{{- with .Memory }}
-    memory: {{ .Requests }}
+{{- range $ri, $rv := .Requests}}
+{{- if eq $ri "memory"}}
+    memory: {{ $rv | quote  }}
 {{- end }}
-{{- with .CPU }}
-    cpu: {{ .Requests }}{{ .Limits }}
-{{- end }}
+{{- if eq $ri "cpu"}}
+    cpu: {{ $rv | quote  }}
+{{- end}}
+{{- end}}
 `
 
 	result, _ := defaultParser.ParseString(tmpl, r)
@@ -324,7 +323,7 @@ resources:
 }
 
 // ParseConfigMap 解析配置
-func ParseConfigMap(configs []*v12.Configuration, lastName, id string) string {
+func ParseConfigMap(configs []*v1.Configuration, lastName, id string) string {
 	if len(configs) < 1 {
 		return ""
 	}
@@ -348,7 +347,7 @@ data:
 }
 
 // ParseVolumeMounts 解析挂载点
-func ParseVolumeMounts(volumes []*v12.Volume, configs []*v12.Configuration, logs []*v12.Log) string {
+func ParseVolumeMounts(volumes []*v1.Volume, configs []*v1.Configuration, logs []*v1.Log) string {
 	if len(volumes) < 1 && len(configs) < 1 && len(logs) < 1 {
 		return ""
 	}
@@ -381,7 +380,7 @@ volumeMounts:
 }
 
 // ParseVolumes 解析卷
-func ParseVolumes(volumes []*v12.Volume, configs []*v12.Configuration, logs []*v12.Log, lastName, id string) string {
+func ParseVolumes(volumes []*v1.Volume, configs []*v1.Configuration, logs []*v1.Log, lastName, id string) string {
 	if len(volumes) < 1 && len(configs) < 1 && len(logs) < 1 {
 		return ""
 	}
@@ -431,7 +430,7 @@ volumes:
 }
 
 // ParseDestinationRule 解析目标规则
-func ParseDestinationRule(service *v12.Service, connectionPool *v12.ConnectionPool, outlierDetection *v12.OutlierDetection, loadBalancer *v12.LoadBalancer, lastName, id, title string) string {
+func ParseDestinationRule(service *v1.Service, connectionPool *v1.ConnectionPool, outlierDetection *v1.OutlierDetection, loadBalancer *v1.LoadBalancer, lastName, id, title string) string {
 	if service == nil {
 		return ""
 	}
@@ -534,7 +533,7 @@ spec:
 	return strings.TrimSpace(result)
 }
 
-func ParseArguments(arguments []*v12.Argument) string {
+func ParseArguments(arguments []*v1.Argument) string {
 	if len(arguments) < 1 {
 		return ""
 	}
@@ -551,7 +550,7 @@ args:
 }
 
 // ParseUpdateStrategy 解析升级策略
-func ParseUpdateStrategy(volumes []*v12.Volume, updateStrategy *v12.UpdateStrategy, podManagementPolicy *v12.PodManagementPolicy, uniqueness bool) string {
+func ParseUpdateStrategy(volumes []*v1.Volume, updateStrategy *v1.UpdateStrategy, podManagementPolicy *v1.PodManagementPolicy, uniqueness bool) string {
 	if updateStrategy == nil {
 		return ""
 	}
@@ -564,8 +563,8 @@ func ParseUpdateStrategy(volumes []*v12.Volume, updateStrategy *v12.UpdateStrate
 		field = "updateStrategy"
 	}
 
-	if *updateStrategy == v12.RecreateStrategy && field == "updateStrategy" {
-		strategy = v12.OnDeleteStrategy
+	if *updateStrategy == v1.RecreateStrategy && field == "updateStrategy" {
+		strategy = v1.OnDeleteStrategy
 	}
 
 	tmpl := `
@@ -576,15 +575,15 @@ func ParseUpdateStrategy(volumes []*v12.Volume, updateStrategy *v12.UpdateStrate
 }
 
 // ParsePodManagementPolicy 明确是否需要podManagementPolicy字段
-func ParsePodManagementPolicy(podManagementPolicy *v12.PodManagementPolicy) string {
-	if podManagementPolicy != nil && *podManagementPolicy == v12.OrderedReadyPolicy {
+func ParsePodManagementPolicy(podManagementPolicy *v1.PodManagementPolicy) string {
+	if podManagementPolicy != nil && *podManagementPolicy == v1.OrderedReadyPolicy {
 		return "podManagementPolicy: OrderedReady"
 	}
 	return ""
 }
 
 // ParseKind 判定部署类型
-func ParseKind(volumes []*v12.Volume, podManagementPolicy *v12.PodManagementPolicy, uniqueness bool) string {
+func ParseKind(volumes []*v1.Volume, podManagementPolicy *v1.PodManagementPolicy, uniqueness bool) string {
 	return "kind: " + parseKind(volumes, podManagementPolicy, uniqueness)
 }
 
@@ -598,7 +597,7 @@ func ParseCommand(command string) string {
 }
 
 // ParseHandler 解析lifecycle和probe中的handler
-func ParseHandler(handler *v12.Handler) string {
+func ParseHandler(handler *v1.Handler) string {
 	if handler == nil {
 		return ""
 	}
@@ -641,7 +640,7 @@ tcpSocket:
 }
 
 // ParseLifecycle 解析lifecycle
-func ParseLifecycle(terminator *v12.Terminator) string {
+func ParseLifecycle(terminator *v1.Terminator) string {
 	if terminator == nil {
 		return ""
 	}
@@ -656,7 +655,7 @@ lifecycle:
 }
 
 // ParseProbe 解析探针
-func ParseProbe(readinessProbe, livenessProbe, startupProbe *v12.Probe) string {
+func ParseProbe(readinessProbe, livenessProbe, startupProbe *v1.Probe) string {
 	if readinessProbe == nil && livenessProbe == nil && startupProbe == nil {
 		return ""
 	}
@@ -704,7 +703,7 @@ readinessProbe:
 }
 
 // ParseEnvironments 解析环境变量
-func ParseEnvironments(environments []*v12.Environment) string {
+func ParseEnvironments(environments []*v1.Environment) string {
 	tmpl := `
 {{- with . -}}
 env:
@@ -719,7 +718,7 @@ env:
 }
 
 // ParseTerminationGracePeriodSeconds 解析terminationGracePeriodSeconds
-func ParseTerminationGracePeriodSeconds(terminator *v12.Terminator) string {
+func ParseTerminationGracePeriodSeconds(terminator *v1.Terminator) string {
 	if terminator == nil {
 		return ""
 	}
@@ -729,7 +728,7 @@ func ParseTerminationGracePeriodSeconds(terminator *v12.Terminator) string {
 }
 
 // ParseImage 解析镜像
-func ParseImage(image *v12.Image) string {
+func ParseImage(image *v1.Image) string {
 	if image == nil {
 		return ""
 	}
@@ -744,7 +743,7 @@ imagePullPolicy: IfNotPresent
 }
 
 // ParseAutoscaler 解析HPA
-func ParseAutoscaler(autoscaler *v12.Autoscaler, kind, lastName, id string) string {
+func ParseAutoscaler(autoscaler *v1.Autoscaler, kind, lastName, id string) string {
 	if autoscaler == nil {
 		return ""
 	}
@@ -795,8 +794,8 @@ func ParseWorkingDirectory(workingDirectory string) string {
 	return fmt.Sprintf("workingDir: %s", workingDirectory)
 }
 
-func ParseReplicas(power *v12.Power, replicas int64) string {
-	if power == nil || *power == v12.PowerOn {
+func ParseReplicas(power *v1.Power, replicas int64) string {
+	if power == nil || *power == v1.PowerOn {
 		return fmt.Sprintf("replicas: %v", func() int64 {
 			if replicas == 0 {
 				return 1
@@ -808,7 +807,7 @@ func ParseReplicas(power *v12.Power, replicas int64) string {
 }
 
 // ParsePodLabels 生成Pod使用的Label
-func ParsePodLabels(labels []*v12.Label, id string) string {
+func ParsePodLabels(labels []*v1.Label, id string) string {
 	if len(labels) < 1 || id == "" {
 		return ""
 	}
@@ -824,10 +823,10 @@ operator.dameng.com/tenant-{{ .Name | hexenc }}: {{ .Value | hexenc | quote }}
 }
 
 // ParseVolumeClaimTemplates 解析volume模版
-func ParseVolumeClaimTemplates(volumes []*v12.Volume, id string) string {
-	var vcts []*v12.Volume
+func ParseVolumeClaimTemplates(volumes []*v1.Volume, id string) string {
+	var vcts []*v1.Volume
 	for _, volume := range volumes {
-		if volume.Type == v12.PersistentVolumeClaim {
+		if volume.Type == v1.PersistentVolumeClaim {
 			vcts = append(vcts, volume)
 		}
 	}
@@ -870,7 +869,7 @@ func ParseAffinity() string {
 }
 
 // ParseHeadlessService 解析HeadlessService
-func ParseHeadlessService(service *v12.Service, volumes []*v12.Volume, podManagementPolicy *v12.PodManagementPolicy, uniqueness bool, lastName, id string) string {
+func ParseHeadlessService(service *v1.Service, volumes []*v1.Volume, podManagementPolicy *v1.PodManagementPolicy, uniqueness bool, lastName, id string) string {
 	kind := parseKind(volumes, podManagementPolicy, uniqueness)
 	if kind != "StatefulSet" {
 		return ""
@@ -901,7 +900,7 @@ spec:
 	return strings.TrimSpace(result)
 }
 
-func ParseServiceName(volumes []*v12.Volume, podManagementPolicy *v12.PodManagementPolicy, uniqueness bool, lastName string) string {
+func ParseServiceName(volumes []*v1.Volume, podManagementPolicy *v1.PodManagementPolicy, uniqueness bool, lastName string) string {
 	kind := parseKind(volumes, podManagementPolicy, uniqueness)
 	if kind == "StatefulSet" {
 		return fmt.Sprintf("serviceName: %s", lastName)
@@ -910,7 +909,7 @@ func ParseServiceName(volumes []*v12.Volume, podManagementPolicy *v12.PodManagem
 }
 
 // configConverter 配置文件格式转化逻辑
-func configConverter(configs []*v12.Configuration) map[string][]string {
+func configConverter(configs []*v1.Configuration) map[string][]string {
 	files := make(map[string][]string)
 	for _, config := range configs {
 		name := path.Base(config.MountPoint)
@@ -925,8 +924,8 @@ func configConverter(configs []*v12.Configuration) map[string][]string {
 }
 
 // parseKind 判定部署类型
-func parseKind(volumes []*v12.Volume, podManagementPolicy *v12.PodManagementPolicy, uniqueness bool) string {
-	if (podManagementPolicy != nil && *podManagementPolicy == v12.OrderedReadyPolicy) || uniqueness {
+func parseKind(volumes []*v1.Volume, podManagementPolicy *v1.PodManagementPolicy, uniqueness bool) string {
+	if (podManagementPolicy != nil && *podManagementPolicy == v1.OrderedReadyPolicy) || uniqueness {
 		return "StatefulSet"
 	}
 	if len(volumes) > 0 {
@@ -984,89 +983,92 @@ func KubernetesConfHelper(object interface{}) (conf KubernetesConf) {
 	title := fields.FieldByName("Title").String()
 	klog.V(4).InfoS(fmt.Sprintf("template helper: %s", lastName), "title", title)
 
-	configs, ok := fields.FieldByName("Configurations").Interface().([]*v12.Configuration)
+	configs, ok := fields.FieldByName("Configurations").Interface().([]*v1.Configuration)
 	klog.V(4).InfoS(fmt.Sprintf("template helper: %s", lastName), "ok", ok, "configs", configs)
 
-	volumes, ok := fields.FieldByName("Volumes").Interface().([]*v12.Volume)
+	volumes, ok := fields.FieldByName("Volumes").Interface().([]*v1.Volume)
 	klog.V(4).InfoS(fmt.Sprintf("template helper: %s", lastName), "ok", ok, "volumes", volumes)
 
-	exporter, ok := fields.FieldByName("Exporter").Interface().(*v12.Exporter)
+	exporter, ok := fields.FieldByName("Exporter").Interface().(*v1.Exporter)
 	klog.V(4).InfoS(fmt.Sprintf("template helper: %s", lastName), "ok", ok, "exporter", exporter)
 
 	replicas := fields.FieldByName("Replicas").Int()
 	klog.V(4).InfoS(fmt.Sprintf("template helper: %s", lastName), "ok", ok, "replicas", replicas)
 
-	power := fields.FieldByName("Power").Interface().(*v12.Power)
+	power := fields.FieldByName("Power").Interface().(*v1.Power)
 	klog.V(4).InfoS(fmt.Sprintf("template helper: %s", lastName), "ok", ok, "power", power)
 
 	command := fields.FieldByName("Command").String()
 	klog.V(4).InfoS(fmt.Sprintf("template helper: %s", lastName), "ok", ok, "command", command)
 
-	arguments, ok := fields.FieldByName("Arguments").Interface().([]*v12.Argument)
+	arguments, ok := fields.FieldByName("Arguments").Interface().([]*v1.Argument)
 	klog.V(4).InfoS(fmt.Sprintf("template helper: %s", lastName), "ok", ok, "arguments", arguments)
 
-	environments, ok := fields.FieldByName("Environments").Interface().([]*v12.Environment)
+	environments, ok := fields.FieldByName("Environments").Interface().([]*v1.Environment)
 	klog.V(4).InfoS(fmt.Sprintf("template helper: %s", lastName), "ok", ok, "environments", environments)
 
-	terminator, ok := fields.FieldByName("Terminator").Interface().(*v12.Terminator)
+	terminator, ok := fields.FieldByName("Terminator").Interface().(*v1.Terminator)
 	klog.V(4).InfoS(fmt.Sprintf("template helper: %s", lastName), "ok", ok, "terminator", terminator)
 
-	logs, ok := fields.FieldByName("Logs").Interface().([]*v12.Log)
+	logs, ok := fields.FieldByName("Logs").Interface().([]*v1.Log)
 	klog.V(4).InfoS(fmt.Sprintf("template helper: %s", lastName), "ok", ok, "logs", logs)
 
-	service, ok := fields.FieldByName("Service").Interface().(*v12.Service)
+	service, ok := fields.FieldByName("Service").Interface().(*v1.Service)
 	klog.V(4).InfoS(fmt.Sprintf("template helper: %s", lastName), "ok", ok, "service", service)
 
-	updateStrategy := fields.FieldByName("UpdateStrategy").Interface().(*v12.UpdateStrategy)
+	updateStrategy := fields.FieldByName("UpdateStrategy").Interface().(*v1.UpdateStrategy)
 	klog.V(4).InfoS(fmt.Sprintf("template helper: %s", lastName), "ok", ok, "updateStrategy", updateStrategy)
 
-	podManagementPolicy := fields.FieldByName("PodManagementPolicy").Interface().(*v12.PodManagementPolicy)
+	podManagementPolicy := fields.FieldByName("PodManagementPolicy").Interface().(*v1.PodManagementPolicy)
 	klog.V(4).InfoS(fmt.Sprintf("template helper: %s", lastName), "podManagementPolicy", podManagementPolicy)
 
-	memory, ok := fields.FieldByName("Memory").Interface().(*v12.Resource)
-	klog.V(4).InfoS(fmt.Sprintf("template helper: %s", lastName), "ok", ok, "memory", memory)
+	//memory, ok := fields.FieldByName("Memory").Interface().(*v12.Resource)
+	//klog.V(4).InfoS(fmt.Sprintf("template helper: %s", lastName), "ok", ok, "memory", memory)
+	//
+	//cpu, ok := fields.FieldByName("CPU").Interface().(*v12.Resource)
+	//klog.V(4).InfoS(fmt.Sprintf("template helper: %s", lastName), "ok", ok, "cpu", cpu)
 
-	cpu, ok := fields.FieldByName("CPU").Interface().(*v12.Resource)
-	klog.V(4).InfoS(fmt.Sprintf("template helper: %s", lastName), "ok", ok, "cpu", cpu)
-
-	nodeSelector, ok := fields.FieldByName("NodeSelector").Interface().([]*v12.Label)
+	nodeSelector, ok := fields.FieldByName("NodeSelector").Interface().([]*v1.Label)
 	klog.V(4).InfoS(fmt.Sprintf("template helper: %s", lastName), "ok", ok, "nodeSelector", nodeSelector)
 
-	hostAliases, ok := fields.FieldByName("HostAliases").Interface().([]*v12.HostAlias)
+	hostAliases, ok := fields.FieldByName("HostAliases").Interface().([]*v1.HostAlias)
 	klog.V(4).InfoS(fmt.Sprintf("template helper: %s", lastName), "ok", ok, "hostAliases", hostAliases)
 
-	loadBalancer, ok := fields.FieldByName("LoadBalancer").Interface().(*v12.LoadBalancer)
+	loadBalancer, ok := fields.FieldByName("LoadBalancer").Interface().(*v1.LoadBalancer)
 	klog.V(4).InfoS(fmt.Sprintf("template helper: %s", lastName), "ok", ok, "loadBalancer", loadBalancer)
 
-	connectionPool, ok := fields.FieldByName("ConnectionPool").Interface().(*v12.ConnectionPool)
+	connectionPool, ok := fields.FieldByName("ConnectionPool").Interface().(*v1.ConnectionPool)
 	klog.V(4).InfoS(fmt.Sprintf("template helper: %s", lastName), "ok", ok, "connectionPool", connectionPool)
 
-	outlierDetection, ok := fields.FieldByName("OutlierDetection").Interface().(*v12.OutlierDetection)
+	outlierDetection, ok := fields.FieldByName("OutlierDetection").Interface().(*v1.OutlierDetection)
 	klog.V(4).InfoS(fmt.Sprintf("template helper: %s", lastName), "ok", ok, "outlierDetection", outlierDetection)
 
-	autoscaler, ok := fields.FieldByName("Autoscaler").Interface().(*v12.Autoscaler)
+	autoscaler, ok := fields.FieldByName("Autoscaler").Interface().(*v1.Autoscaler)
 	klog.V(4).InfoS(fmt.Sprintf("template helper: %s", lastName), "ok", ok, "autoscaler", autoscaler)
 
-	readinessProbe, ok := fields.FieldByName("ReadinessProbe").Interface().(*v12.Probe)
+	readinessProbe, ok := fields.FieldByName("ReadinessProbe").Interface().(*v1.Probe)
 	klog.V(4).InfoS(fmt.Sprintf("template helper: %s", lastName), "ok", ok, "readinessProbe", readinessProbe)
 
-	livenessProbe, ok := fields.FieldByName("LivenessProbe").Interface().(*v12.Probe)
+	livenessProbe, ok := fields.FieldByName("LivenessProbe").Interface().(*v1.Probe)
 	klog.V(4).InfoS(fmt.Sprintf("template helper: %s", lastName), "ok", ok, "livenessProbe", livenessProbe)
 
-	startupProbe, ok := fields.FieldByName("StartupProbe").Interface().(*v12.Probe)
+	startupProbe, ok := fields.FieldByName("StartupProbe").Interface().(*v1.Probe)
 	klog.V(4).InfoS(fmt.Sprintf("template helper: %s", lastName), "ok", ok, "startupProbe", startupProbe)
 
 	ip := fields.FieldByName("IP").String()
 	klog.V(4).InfoS(fmt.Sprintf("template helper: %s", lastName), "ip", ip)
 
-	image, ok := fields.FieldByName("Image").Interface().(*v12.Image)
+	image, ok := fields.FieldByName("Image").Interface().(*v1.Image)
 	klog.V(4).InfoS(fmt.Sprintf("template helper: %s", lastName), "ok", ok, "image", image)
 
 	workingDirectory := fields.FieldByName("WorkingDirectory").String()
 	klog.V(4).InfoS(fmt.Sprintf("template helper: %s", lastName), "workingDirectory", workingDirectory)
 
-	labels, ok := fields.FieldByName("Labels").Interface().([]*v12.Label)
+	labels, ok := fields.FieldByName("Labels").Interface().([]*v1.Label)
 	klog.V(4).InfoS(fmt.Sprintf("template helper: %s", lastName), "ok", ok, "labels", labels)
+
+	rs, ok := fields.FieldByName("Resources").Interface().(*v1.Resources)
+	klog.V(4).InfoS(fmt.Sprintf("template helper: %s", lastName), "ok", ok, "Resources", rs)
 
 	conf.ConfigMap = ParseConfigMap(configs, lastName, id)
 	klog.V(5).InfoS(fmt.Sprintf("template helper: %s", lastName), "ConfigMap", conf.ConfigMap)
@@ -1124,7 +1126,6 @@ func KubernetesConfHelper(object interface{}) (conf KubernetesConf) {
 	conf.Environments = ParseEnvironments(environments)
 	klog.V(5).InfoS(fmt.Sprintf("template helper: %s", lastName), "Environments", conf.Environments)
 
-	rs := fields.FieldByName("Resources").Interface().(*corev1.ResourceRequirements)
 	conf.Resources = ParseResources(rs)
 	klog.V(5).InfoS(fmt.Sprintf("template helper: %s", lastName), "Resources", conf.Resources)
 

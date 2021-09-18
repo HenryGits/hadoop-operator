@@ -3,7 +3,7 @@ kind: ConfigMap
 metadata:
   name: {{ $.ObjectMeta.Name }}
   labels:
-    app: hadoop
+    app: {{ $.ObjectMeta.Name }}
     chart: hadoop-1.1.4
     release: {{ $.ObjectMeta.Name }}
     operator.dameng.com/id: {{ $.Spec.ID | quote }}
@@ -14,7 +14,7 @@ data:
     <configuration>
       <property>
         <name>fs.defaultFS</name>
-        <value>hdfs://{{ $.ObjectMeta.Name }}-hdfs-nn:9000/</value>
+        <value>hdfs://{{ $.ObjectMeta.Name }}-namenode:9000/</value>
         <description>NameNode URI</description>
       </property>
     </configuration>
@@ -84,18 +84,18 @@ data:
       </property>
       <property>
         <name>mapreduce.jobhistory.address</name>
-        <value>{{ $.ObjectMeta.Name }}-yarn-rm-0.{{ $.ObjectMeta.Name }}-yarn-rm.{{ $.ObjectMeta.Namespace }}.svc.cluster.local:10020</value>
+        <value>{{ $.ObjectMeta.Name }}-resourcemanager-0.{{ $.ObjectMeta.Name }}-resourcemanager.{{ $.ObjectMeta.Namespace }}.svc.cluster.local:10020</value>
       </property>
       <property>
         <name>mapreduce.jobhistory.webapp.address</name>
-        <value>{{ $.ObjectMeta.Name }}-yarn-rm-0.{{ $.ObjectMeta.Name }}-yarn-rm.{{ $.ObjectMeta.Namespace }}.svc.cluster.local:19888</value>
+        <value>{{ $.ObjectMeta.Name }}-resourcemanager-0.{{ $.ObjectMeta.Name }}-resourcemanager.{{ $.ObjectMeta.Namespace }}.svc.cluster.local:19888</value>
       </property>
     </configuration>
 
   workers: |
     {{- $count := $.Spec.Hdfs.DataNode.PdbMinAvailable | int -}}
     {{- range $i, $e := until $count }}
-    {{ $.ObjectMeta.Name }}-hdfs-dn-{{ $i }}.{{ $.ObjectMeta.Name }}-hdfs-dn.{{ $.ObjectMeta.Namespace }}.svc.cluster.local
+    {{ $.ObjectMeta.Name }}-datanode-{{ $i }}.{{ $.ObjectMeta.Name }}-datanode.{{ $.ObjectMeta.Namespace }}.svc.cluster.local
     {{- end }}
 
   start-yarn-nm.sh: |
@@ -179,7 +179,7 @@ data:
     <configuration>
       <property>
         <name>yarn.resourcemanager.hostname</name>
-        <value>{{ $.ObjectMeta.Name }}-yarn-rm</value>
+        <value>{{ $.ObjectMeta.Name }}-resourcemanager</value>
       </property>
 
       <!-- Bind to all interfaces -->
@@ -249,85 +249,87 @@ data:
 
 
 
+
 ---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: {{ $.ObjectMeta.Name }}-hdfs-dn
+  name: {{ $.ObjectMeta.Name }}-datanode
   labels:
-    app: {{ $.ObjectMeta.Name }}-hdfs-dn
+    app: {{ $.ObjectMeta.Name }}-datanode
     chart: hadoop-1.1.4
-    release: {{ $.ObjectMeta.Name }}-hdfs-dn
-    component: {{ $.ObjectMeta.Name }}-hdfs-dn
+    release: {{ $.ObjectMeta.Name }}-datanode
+    component: {{ $.ObjectMeta.Name }}-datanode
     operator.dameng.com/id: {{ $.Spec.ID | quote }}
   annotations:
     operator.dameng.com/title: {{ $.Spec.Title | hexenc | quote }}
 spec:
-  serviceName: {{ $.ObjectMeta.Name }}-hdfs-dn
+  serviceName: {{ $.ObjectMeta.Name }}-datanode
   replicas: {{ $.Spec.Hdfs.DataNode.PdbMinAvailable }}
   selector:
     matchLabels:
-      app: {{ $.ObjectMeta.Name }}-hdfs-dn
-      release: {{ $.ObjectMeta.Name }}-hdfs-dn
-      component: {{ $.ObjectMeta.Name }}-hdfs-dn
+      app: {{ $.ObjectMeta.Name }}-datanode
+      release: {{ $.ObjectMeta.Name }}-datanode
+      component: {{ $.ObjectMeta.Name }}-datanode
   template:
     metadata:
       labels:
-        app: {{ $.ObjectMeta.Name }}-hdfs-dn
-        release: {{ $.ObjectMeta.Name }}-hdfs-dn
-        component: {{ $.ObjectMeta.Name }}-hdfs-dn
+        app: {{ $.ObjectMeta.Name }}-datanode
+        release: {{ $.ObjectMeta.Name }}-datanode
+        component: {{ $.ObjectMeta.Name }}-datanode
         operator.dameng.com/id: {{ $.Spec.ID | quote }}
         sidecar.istio.io/inject: "false"
     spec:
       affinity:
         podAntiAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
-          - topologyKey: "kubernetes.io/hostname"
-            labelSelector:
-              matchLabels:
-                app: dn
-                release: dn
-                component: dn
+            - topologyKey: "kubernetes.io/hostname"
+              labelSelector:
+                matchLabels:
+                  app: dn
+                  release: dn
+                  component: dn
       terminationGracePeriodSeconds: 0
       containers:
-      - name: {{ $.ObjectMeta.Name }}-hdfs-dn
-        image: {{ $.Spec.Container.Image }}
-        imagePullPolicy: {{ $.Spec.Container.PullPolicy | quote }}
-        args:
-          - "--DataNode"
-        {{ parseResources $.Spec.Hdfs.DataNode.Resources | indent 8 }}
-        readinessProbe:
-          httpGet:
-            path: /
-            port: 9864
-          initialDelaySeconds: 5
-          timeoutSeconds: 2
-        livenessProbe:
-          httpGet:
-            path: /
-            port: 9864
-          initialDelaySeconds: 10
-          timeoutSeconds: 2
-        volumeMounts:
-        - name: hadoop-config
-          mountPath: /usr/local/hadoop/etc/hadoop
-        - name: dfs
-          mountPath: /usr/local/hadoop/dn
+        - name: {{ $.ObjectMeta.Name }}-datanode
+          image: {{ $.Spec.Container.Image }}
+          imagePullPolicy: {{ $.Spec.Container.PullPolicy | quote }}
+          args:
+            - "--DataNode"
+{{ parseResources $.Spec.Hdfs.DataNode.Resources | indent 10 }}
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 9864
+            initialDelaySeconds: 5
+            timeoutSeconds: 2
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 9864
+            initialDelaySeconds: 10
+            timeoutSeconds: 2
+          volumeMounts:
+            - name: hadoop-config
+              mountPath: /usr/local/hadoop/etc/hadoop
+            - name: dfs
+              mountPath: /usr/local/hadoop/dn
       volumes:
-      - name: hadoop-config
-        configMap:
-          name: {{ $.ObjectMeta.Name }}
-      - name: dfs
-        hostPath:
-          # Ensure the file directory is created.
-          path: /home/data/dn
-          type: DirectoryOrCreate
+        - name: hadoop-config
+          configMap:
+            name: {{ $.ObjectMeta.Name }}
+        - name: dfs
+          hostPath:
+            # Ensure the file directory is created.
+            path: /home/data/dn
+            type: DirectoryOrCreate
+
 
 ---
-apiVersion: policy/v1
+apiVersion: policy/v1beta1
 kind: PodDisruptionBudget
 metadata:
-  name: {{ $.ObjectMeta.Name }}-hdfs-dn
+  name: {{ $.ObjectMeta.Name }}-datanode
   labels:
     app: hadoop
     chart: hadoop-1.1.4
@@ -346,53 +348,53 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ $.ObjectMeta.Name }}-hdfs-dn
+  name: {{ $.ObjectMeta.Name }}-datanode
   labels:
-    app: hadoop
+    app: {{ $.ObjectMeta.Name }}-datanode
     chart: hadoop-1.1.4
-    release: {{ $.ObjectMeta.Name }}
-    component: hdfs-dn
+    release: {{ $.ObjectMeta.Name }}-datanode
+    component: {{ $.ObjectMeta.Name }}-datanode
     operator.dameng.com/id: {{ $.Spec.ID | quote }}
 spec:
   ports:
-  - name: dfs
-    port: 9000
-    protocol: TCP
-  - name: webhdfs
-    port: 9864
+    - name: dfs
+      port: 9000
+      protocol: TCP
+    - name: webhdfs
+      port: 9864
   clusterIP: None
   selector:
-    app: {{ $.ObjectMeta.Name }}
-    release: {{ $.ObjectMeta.Name }}
-    component: {{ $.ObjectMeta.Name }}
+    app: {{ $.ObjectMeta.Name }}-datanode
+    release: {{ $.ObjectMeta.Name }}-datanode
+    component: {{ $.ObjectMeta.Name }}-datanode
 
 ---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: {{ $.ObjectMeta.Name }}-hdfs-nn
+  name: {{ $.ObjectMeta.Name }}-namenode
   labels:
-    app: hadoop
+    app: {{ $.ObjectMeta.Name }}-namenode
     chart: hadoop-1.1.4
-    release: {{ $.ObjectMeta.Name }}
-    component: hdfs-nn
+    release: {{ $.ObjectMeta.Name }}-namenode
+    component: {{ $.ObjectMeta.Name }}-namenode
     operator.dameng.com/id: {{ $.Spec.ID | quote }}
   annotations:
     operator.dameng.com/title: {{ $.Spec.Title | hexenc | quote }}
 spec:
-  serviceName: {{ $.ObjectMeta.Name }}-hdfs-nn
+  serviceName: {{ $.ObjectMeta.Name }}-namenode
   replicas: {{ $.Spec.Hdfs.NameNode.PdbMinAvailable }}
   selector:
     matchLabels:
-      app: hadoop
-      release: {{ $.ObjectMeta.Name }}
-      component: hdfs-nn
+      app: {{ $.ObjectMeta.Name }}-namenode
+      release: {{ $.ObjectMeta.Name }}-namenode
+      component: {{ $.ObjectMeta.Name }}-namenode
   template:
     metadata:
       labels:
-        app: hadoop
-        release: {{ $.ObjectMeta.Name }}
-        component: hdfs-nn
+        app: {{ $.ObjectMeta.Name }}-namenode
+        release: {{ $.ObjectMeta.Name }}-namenode
+        component: {{ $.ObjectMeta.Name }}-namenode
         operator.dameng.com/id: {{ $.Spec.ID | quote }}
         sidecar.istio.io/inject: "false"
     spec:
@@ -402,31 +404,23 @@ spec:
             - topologyKey: "kubernetes.io/hostname"
               labelSelector:
                 matchLabels:
-                  app: {{ $.ObjectMeta.Name }}
-                  release: {{ $.ObjectMeta.Name }}
-                  component: {{ $.ObjectMeta.Name }}
-          preferredDuringSchedulingIgnoredDuringExecution:
-            - weight: 5
-              podAffinityTerm:
-                topologyKey: "kubernetes.io/hostname"
-                labelSelector:
-                  matchLabels:
-                    app: {{ $.ObjectMeta.Name }}
-                    release: {{ $.ObjectMeta.Name }}
+                  app: {{ $.ObjectMeta.Name }}-namenode
+                  release: {{ $.ObjectMeta.Name }}-namenode
+                  component: {{ $.ObjectMeta.Name }}-namenode
       terminationGracePeriodSeconds: 0
       containers:
-        - name: hdfs-nn
+        - name: {{ $.ObjectMeta.Name }}-namenode
           image: "{{ $.Spec.Container.Image }}"
           imagePullPolicy: {{ $.Spec.Container.PullPolicy | quote }}
           args:
             - "--NameNode"
-            - "--nnDir=$(HDFS_NAME_NODE_DIR)"
+            - "--NameNodeDir=$(HDFS_NAME_NODE_DIR)"
           securityContext:
             privileged: true
           env:
             - name: HDFS_NAME_NODE_DIR
               value: "/usr/local/hadoop/nn"
-          {{ parseResources $.Spec.Hdfs.NameNode.Resources | indent 8 }}
+{{ parseResources $.Spec.Hdfs.NameNode.Resources | indent 10 }}
           readinessProbe:
             httpGet:
               path: /
@@ -455,22 +449,22 @@ spec:
             type: DirectoryOrCreate
 
 ---
-apiVersion: policy/v1
+apiVersion: policy/v1beta1
 kind: PodDisruptionBudget
 metadata:
-  name: {{ $.ObjectMeta.Name }}-hdfs-nn
+  name: {{ $.ObjectMeta.Name }}-namenode
   labels:
-    app: hadoop
+    app: {{ $.ObjectMeta.Name }}-namenode
     chart: hadoop-1.1.4
     release: {{ $.ObjectMeta.Name }}
-    component: hdfs-nn
+    component: {{ $.ObjectMeta.Name }}-namenode
     operator.dameng.com/id: {{ $.Spec.ID | quote }}
 spec:
   selector:
     matchLabels:
-      app: hadoop
-      release: {{ $.ObjectMeta.Name }}
-      component: hdfs-nn
+      app: {{ $.ObjectMeta.Name }}-namenode
+      release: {{ $.ObjectMeta.Name }}-namenode
+      component: {{ $.ObjectMeta.Name }}-namenode
   minAvailable: {{ $.Spec.Hdfs.NameNode.PdbMinAvailable }}
 
 
@@ -478,12 +472,12 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ $.ObjectMeta.Name }}-hdfs-nn
+  name: {{ $.ObjectMeta.Name }}-namenode
   labels:
-    app: hadoop
+    app: {{ $.ObjectMeta.Name }}-namenode
     chart: hadoop-1.1.4
-    release: {{ $.ObjectMeta.Name }}
-    component: hdfs-nn
+    release: {{ $.ObjectMeta.Name }}-namenode
+    component: {{ $.ObjectMeta.Name }}-namenode
     operator.dameng.com/id: {{ $.Spec.ID | quote }}
 spec:
   ports:
@@ -494,38 +488,38 @@ spec:
       port: 9870
   clusterIP: None
   selector:
-    app: hadoop
-    release: {{ $.ObjectMeta.Name }}
-    component: hdfs-nn
+    app: {{ $.ObjectMeta.Name }}-namenode
+    release: {{ $.ObjectMeta.Name }}-namenode
+    component: {{ $.ObjectMeta.Name }}-namenode
 
 
 ---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: {{ $.ObjectMeta.Name }}-yarn-rm
+  name: {{ $.ObjectMeta.Name }}-resourcemanager
   labels:
-    app: hadoop
+    app: {{ $.ObjectMeta.Name }}-resourcemanager
     chart: hadoop-1.1.4
-    release: {{ $.ObjectMeta.Name }}
-    component: yarn-rm
+    release: {{ $.ObjectMeta.Name }}-resourcemanager
+    component: {{ $.ObjectMeta.Name }}-resourcemanager
     operator.dameng.com/id: {{ $.Spec.ID | quote }}
   annotations:
     operator.dameng.com/title: {{ $.Spec.Title | hexenc | quote }}
 spec:
-  serviceName: {{ $.ObjectMeta.Name }}-yarn-rm
-  replicas: {{ $.Spec.ResourceManager.PdbMinAvailable }}
+  serviceName: {{ $.ObjectMeta.Name }}-resourcemanager
+  replicas: 1
   selector:
     matchLabels:
-      app: hadoop
-      release: {{ $.ObjectMeta.Name }}
-      component: yarn-rm
+      app: {{ $.ObjectMeta.Name }}-resourcemanager
+      release: {{ $.ObjectMeta.Name }}-resourcemanager
+      component: {{ $.ObjectMeta.Name }}-resourcemanager
   template:
     metadata:
       labels:
-        app: hadoop
-        release: {{ $.ObjectMeta.Name }}
-        component: yarn-rm
+        app: {{ $.ObjectMeta.Name }}-resourcemanager
+        release: {{ $.ObjectMeta.Name }}-resourcemanager
+        component: {{ $.ObjectMeta.Name }}-resourcemanager
         operator.dameng.com/id: {{ $.Spec.ID | quote }}
         sidecar.istio.io/inject: "false"
     spec:
@@ -535,31 +529,20 @@ spec:
             - topologyKey: "kubernetes.io/hostname"
               labelSelector:
                 matchLabels:
-                  app: {{ $.ObjectMeta.Name }}
-                  release: {{ $.ObjectMeta.Name }}
-                  component: {{ $.ObjectMeta.Name }}
-          preferredDuringSchedulingIgnoredDuringExecution:
-            - weight: 5
-              podAffinityTerm:
-                topologyKey: "kubernetes.io/hostname"
-                labelSelector:
-                  matchLabels:
-                    app: {{ $.ObjectMeta.Name }}
-                    release: {{ $.ObjectMeta.Name }}
+                  app: {{ $.ObjectMeta.Name }}-resourcemanager
+                  release: {{ $.ObjectMeta.Name }}-resourcemanager
+                  component: {{ $.ObjectMeta.Name }}-resourcemanager
       terminationGracePeriodSeconds: 0
       containers:
-        - name: yarn-rm
+        - name: {{ $.ObjectMeta.Name }}-resourcemanager
           image: "{{ $.Spec.Container.Image }}"
           imagePullPolicy: {{ $.Spec.Container.PullPolicy | quote }}
           ports:
             - containerPort: 8088
               name: web
-          command:
-            - "/bin/bash"
-            - "/tmp/hadoop-config/bootstrap.sh"
-            - "-d"
-          resources:
-            {{ toYaml $.Spec.ResourceManager.Resources | indent 10 }}
+          args:
+            - "--ResourceManager"
+{{ parseResources $.Spec.ResourceManager.Resources | indent 10 }}
           readinessProbe:
             httpGet:
               path: /ws/v1/cluster/info
@@ -574,7 +557,7 @@ spec:
             timeoutSeconds: 2
           volumeMounts:
             - name: hadoop-config
-              mountPath: /tmp/hadoop-config
+              mountPath: /usr/local/hadoop/etc/hadoop
       volumes:
         - name: hadoop-config
           configMap:
@@ -582,35 +565,35 @@ spec:
 
 
 ---
-apiVersion: policy/v1
+apiVersion: policy/v1beta1
 kind: PodDisruptionBudget
 metadata:
-  name: {{ $.ObjectMeta.Name }}-yarn-rm
+  name: {{ $.ObjectMeta.Name }}-resourcemanager
   labels:
-    app: hadoop
+    app: {{ $.ObjectMeta.Name }}-resourcemanager
     chart: hadoop-1.1.4
-    release: {{ $.ObjectMeta.Name }}
-    component: yarn-rm
+    release: {{ $.ObjectMeta.Name }}-resourcemanager
+    component: {{ $.ObjectMeta.Name }}-resourcemanager
     operator.dameng.com/id: {{ $.Spec.ID | quote }}
 spec:
   selector:
     matchLabels:
-      app: hadoop
-      release: {{ $.ObjectMeta.Name }}
-      component: yarn-rm
-  minAvailable: {{ $.Spec.ResourceManager.PdbMinAvailable }}
+      app: {{ $.ObjectMeta.Name }}-resourcemanager
+      release: {{ $.ObjectMeta.Name }}-resourcemanager
+      component: {{ $.ObjectMeta.Name }}-resourcemanager
+  minAvailable: 1
 
 
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ $.ObjectMeta.Name }}-yarn-rm
+  name: {{ $.ObjectMeta.Name }}-resourcemanager
   labels:
-    app: hadoop
+    app: {{ $.ObjectMeta.Name }}-resourcemanager
     chart: hadoop-1.1.4
-    release: {{ $.ObjectMeta.Name }}
-    component: yarn-rm
+    release: {{ $.ObjectMeta.Name }}-resourcemanager
+    component: {{ $.ObjectMeta.Name }}-resourcemanager
     operator.dameng.com/id: {{ $.Spec.ID | quote }}
 spec:
   ports:
@@ -618,9 +601,9 @@ spec:
       name: web
   clusterIP: None
   selector:
-    app: hadoop
-    release: {{ $.ObjectMeta.Name }}
-    component: yarn-rm
+    app: {{ $.ObjectMeta.Name }}-resourcemanager
+    release: {{ $.ObjectMeta.Name }}-resourcemanager
+    component: {{ $.ObjectMeta.Name }}-resourcemanager
 
 
 
@@ -629,32 +612,32 @@ spec:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: {{ $.ObjectMeta.Name }}-yarn-nm
+  name: {{ $.ObjectMeta.Name }}-nodemanager
   labels:
-    app: hadoop
+    app: {{ $.ObjectMeta.Name }}-nodemanager
     chart: hadoop-1.1.4
-    release: {{ $.ObjectMeta.Name }}
-    component: yarn-nm
+    release: {{ $.ObjectMeta.Name }}-nodemanager
+    component: {{ $.ObjectMeta.Name }}-nodemanager
     operator.dameng.com/id: {{ $.Spec.ID | quote }}
   annotations:
     operator.dameng.com/title: {{ $.Spec.Title | hexenc | quote }}
 spec:
-  serviceName: {{ $.ObjectMeta.Name }}-yarn-nm
+  serviceName: {{ $.ObjectMeta.Name }}-nodemanager
   replicas: {{ $.Spec.NodeManager.PdbMinAvailable }}
   selector:
     matchLabels:
-      app: hadoop
-      release: {{ $.ObjectMeta.Name }}
-      component: yarn-nm
+      app: {{ $.ObjectMeta.Name }}-nodemanager
+      release: {{ $.ObjectMeta.Name }}-nodemanager
+      component: {{ $.ObjectMeta.Name }}-nodemanager
   {{- if $.Spec.NodeManager.ParallelCreate }}
   podManagementPolicy: Parallel
   {{- end }}
   template:
     metadata:
       labels:
-        app: hadoop
-        release: {{ $.ObjectMeta.Name }}
-        component: yarn-nm
+        app: {{ $.ObjectMeta.Name }}-nodemanager
+        release: {{ $.ObjectMeta.Name }}-nodemanager
+        component: {{ $.ObjectMeta.Name }}-nodemanager
         operator.dameng.com/id: {{ $.Spec.ID | quote }}
         sidecar.istio.io/inject: "false"
     spec:
@@ -664,34 +647,22 @@ spec:
             - topologyKey: "kubernetes.io/hostname"
               labelSelector:
                 matchLabels:
-                  app: {{ $.ObjectMeta.Name }}
-                  release: {{ $.ObjectMeta.Name }}
-                  component: {{ $.ObjectMeta.Name }}
-          preferredDuringSchedulingIgnoredDuringExecution:
-            - weight: 5
-              podAffinityTerm:
-                topologyKey: "kubernetes.io/hostname"
-                labelSelector:
-                  matchLabels:
-                    app: {{ $.ObjectMeta.Name }}
-                    release: {{ $.ObjectMeta.Name }}
+                  app: {{ $.ObjectMeta.Name }}-nodemanager
+                  release: {{ $.ObjectMeta.Name }}-nodemanager
+                  component: {{ $.ObjectMeta.Name }}-nodemanager
       terminationGracePeriodSeconds: 0
       containers:
-        - name: yarn-nm
+        - name: {{ $.ObjectMeta.Name }}-nodemanager
           image: "{{ $.Spec.Container.Image }}"
           imagePullPolicy: {{ $.Spec.Container.PullPolicy | quote }}
           ports:
             - containerPort: 8088
               name: web
           args:
-            - "--nnDir=$(HDFS_NAME_NODE_DIR)"
+            - "--NodeManager"
           securityContext:
             privileged: true
-          env:
-            - name: HDFS_NAME_NODE_DIR
-              value: "/usr/local/hadoop/nn"
-          resources:
-            {{ toYaml $.Spec.NodeManager.Resources | indent 10 }}
+{{ parseResources $.Spec.NodeManager.Resources | indent 10 }}
           readinessProbe:
             httpGet:
               path: /node
@@ -708,58 +679,60 @@ spec:
             - name: MY_CPU_LIMIT
               valueFrom:
                 resourceFieldRef:
-                  containerName: yarn-nm
+                  containerName: {{ $.ObjectMeta.Name }}-nodemanager
                   resource: limits.cpu
                   divisor: 1
             - name: MY_MEM_LIMIT
               valueFrom:
                 resourceFieldRef:
-                  containerName: yarn-nm
+                  containerName: {{ $.ObjectMeta.Name }}-nodemanager
                   resource: limits.memory
                   divisor: 1M
+            - name: HDFS_NAME_NODE_DIR
+              value: "/usr/local/hadoop/nn"
           volumeMounts:
             - name: hadoop-config
-              mountPath: /tmp/hadoop-config
+              mountPath: /usr/local/hadoop/etc/hadoop
       volumes:
         - name: hadoop-config
           configMap:
             name: {{ $.ObjectMeta.Name }}
         - name: nn-dir
-            hostPath:
-              path: /home/data/nn
-              type: DirectoryOrCreate
+          hostPath:
+            path: /home/data/nn
+            type: DirectoryOrCreate
 
 
 
 ---
-apiVersion: policy/v1
+apiVersion: policy/v1beta1
 kind: PodDisruptionBudget
 metadata:
-  name: {{ $.ObjectMeta.Name }}-yarn-nm
+  name: {{ $.ObjectMeta.Name }}-nodemanager
   labels:
-    app: hadoop
+    app: {{ $.ObjectMeta.Name }}-nodemanager
     chart: hadoop-1.1.4
-    release: {{ $.ObjectMeta.Name }}
-    component: yarn-nm
+    release: {{ $.ObjectMeta.Name }}-nodemanager
+    component: {{ $.ObjectMeta.Name }}-nodemanager
     operator.dameng.com/id: {{ $.Spec.ID | quote }}
 spec:
   selector:
     matchLabels:
-      app: hadoop
-      release: {{ $.ObjectMeta.Name }}
-      component: yarn-nm
+      app: {{ $.ObjectMeta.Name }}-nodemanager
+      release: {{ $.ObjectMeta.Name }}-nodemanager
+      component: {{ $.ObjectMeta.Name }}-nodemanager
   minAvailable: {{ $.Spec.NodeManager.PdbMinAvailable }}
 
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ $.ObjectMeta.Name }}-yarn-nm
+  name: {{ $.ObjectMeta.Name }}-nodemanager
   labels:
-    app: hadoop
+    app: {{ $.ObjectMeta.Name }}-nodemanager
     chart: hadoop-1.1.4
     release: {{ $.ObjectMeta.Name }}
-    component: yarn-nm
+    component: {{ $.ObjectMeta.Name }}-nodemanager
     operator.dameng.com/id: {{ $.Spec.ID | quote }}
 spec:
   ports:
@@ -771,9 +744,9 @@ spec:
       name: api
   clusterIP: None
   selector:
-    app: hadoop
-    release: {{ $.ObjectMeta.Name }}
-    component: yarn-nm
+    app: {{ $.ObjectMeta.Name }}-nodemanager
+    release: {{ $.ObjectMeta.Name }}-nodemanager
+    component: {{ $.ObjectMeta.Name }}-nodemanager
 
 ---
 apiVersion: v1
@@ -781,10 +754,10 @@ kind: Service
 metadata:
   name: {{ $.ObjectMeta.Name }}-hdfs-ui
   labels:
-    app: hadoop
+    app: {{ $.ObjectMeta.Name }}-hdfs-ui
     chart: hadoop-1.1.4
     release: {{ $.ObjectMeta.Name }}
-    component: hdfs-ui
+    component: {{ $.ObjectMeta.Name }}-hdfs-ui
     operator.dameng.com/id: {{ $.Spec.ID | quote }}
 spec:
   type: NodePort
@@ -792,9 +765,9 @@ spec:
     - port: 9870
       name: web
   selector:
-    app: hadoop
-    release: {{ $.ObjectMeta.Name }}
-    component: hdfs-nn
+    app: {{ $.ObjectMeta.Name }}-hdfs-ui
+    release: {{ $.ObjectMeta.Name }}-hdfs-ui
+    component: {{ $.ObjectMeta.Name }}-hdfs-ui
 
 
 ---
@@ -803,10 +776,10 @@ kind: Service
 metadata:
   name: {{ $.ObjectMeta.Name }}-yarn-ui
   labels:
-    app: hadoop
+    app: {{ $.ObjectMeta.Name }}-yarn-ui
     chart: hadoop-1.1.4
     release: {{ $.ObjectMeta.Name }}
-    component: yarn-ui
+    component: {{ $.ObjectMeta.Name }}-yarn-ui
     operator.dameng.com/id: {{ $.Spec.ID | quote }}
 spec:
   type: NodePort
@@ -814,6 +787,116 @@ spec:
     - port: 8088
       name: web
   selector:
-    app: hadoop
-    release: {{ $.ObjectMeta.Name }}
-    component: yarn-rm
+    app: {{ $.ObjectMeta.Name }}-yarn-ui
+    release: {{ $.ObjectMeta.Name }}-yarn-ui
+    component: {{ $.ObjectMeta.Name }}-yarn-ui
+
+
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ $.ObjectMeta.Name }}-historyserver
+  labels:
+    app: {{ $.ObjectMeta.Name }}-historyserver
+    chart: hadoop-1.1.4
+    release: {{ $.ObjectMeta.Name }}-historyserver
+    component: {{ $.ObjectMeta.Name }}-historyserver
+    operator.dameng.com/id: {{ $.Spec.ID | quote }}
+  annotations:
+    operator.dameng.com/title: {{ $.Spec.Title | hexenc | quote }}
+spec:
+  serviceName: {{ $.ObjectMeta.Name }}-historyserver
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ $.ObjectMeta.Name }}-historyserver
+      release: {{ $.ObjectMeta.Name }}-historyserver
+      component: {{ $.ObjectMeta.Name }}-historyserver
+  {{- if $.Spec.NodeManager.ParallelCreate }}
+  podManagementPolicy: Parallel
+  {{- end }}
+  template:
+    metadata:
+      labels:
+        app: {{ $.ObjectMeta.Name }}-historyserver
+        release: {{ $.ObjectMeta.Name }}-historyserver
+        component: {{ $.ObjectMeta.Name }}-historyserver
+        operator.dameng.com/id: {{ $.Spec.ID | quote }}
+        sidecar.istio.io/inject: "false"
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - topologyKey: "kubernetes.io/hostname"
+              labelSelector:
+                matchLabels:
+                  app: {{ $.ObjectMeta.Name }}-historyserver
+                  release: {{ $.ObjectMeta.Name }}-historyserver
+                  component: {{ $.ObjectMeta.Name }}-historyserver
+      terminationGracePeriodSeconds: 0
+      containers:
+        - name: {{ $.ObjectMeta.Name }}-historyserver
+          image: "{{ $.Spec.Container.Image }}"
+          imagePullPolicy: {{ $.Spec.Container.PullPolicy | quote }}
+          ports:
+            - containerPort: 19888
+              name: web
+          args:
+            - "--HistoryServer"
+          securityContext:
+            privileged: true
+{{ parseResources $.Spec.NodeManager.Resources | indent 10 }}
+          volumeMounts:
+            - name: hadoop-config
+              mountPath: /usr/local/hadoop/etc/hadoop
+      volumes:
+        - name: hadoop-config
+          configMap:
+            name: {{ $.ObjectMeta.Name }}
+        - name: nn-dir
+          hostPath:
+            path: /home/data/nn
+            type: DirectoryOrCreate
+
+
+---
+apiVersion: policy/v1beta1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $.ObjectMeta.Name }}-historyserver
+  labels:
+    app: {{ $.ObjectMeta.Name }}-historyserver
+    chart: hadoop-1.1.4
+    release: {{ $.ObjectMeta.Name }}-historyserver
+    component: {{ $.ObjectMeta.Name }}-historyserver
+    operator.dameng.com/id: {{ $.Spec.ID | quote }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ $.ObjectMeta.Name }}-historyserver
+      release: {{ $.ObjectMeta.Name }}-historyserver
+      component: {{ $.ObjectMeta.Name }}-historyserver
+  minAvailable: 1
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $.ObjectMeta.Name }}-historyserver
+  labels:
+    app: {{ $.ObjectMeta.Name }}-historyserver
+    chart: hadoop-1.1.4
+    release: {{ $.ObjectMeta.Name }}-historyserver
+    component: {{ $.ObjectMeta.Name }}-historyserver
+    operator.dameng.com/id: {{ $.Spec.ID | quote }}
+spec:
+  ports:
+    - port: 19888
+      name: web
+  clusterIP: None
+  selector:
+    app: {{ $.ObjectMeta.Name }}-historyserver
+    release: {{ $.ObjectMeta.Name }}-historyserver
+    component: {{ $.ObjectMeta.Name }}-historyserver

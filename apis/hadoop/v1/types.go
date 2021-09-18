@@ -92,10 +92,13 @@ type HostAlias struct {
 	Hostnames []*Hostname `json:"hostnames,omitempty"`
 }
 
-type Resource struct {
-	//IsShare  bool                `json:"isShare,omitempty"`
-	Requests corev1.ResourceList `json:"requests,omitempty"`
-	Limits   corev1.ResourceList `json:"limits,omitempty"`
+type Resources struct {
+	// +optional
+	// +kubebuilder:default:={cpu: "100m", memory: "256Mi"}
+	Requests map[corev1.ResourceName]string `json:"requests,omitempty"`
+	// +optional
+	// +kubebuilder:default:={cpu: "500m", memory: "1Gi"}
+	Limits map[corev1.ResourceName]string `json:"limits,omitempty"`
 }
 
 type Configuration struct {

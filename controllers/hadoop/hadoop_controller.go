@@ -23,7 +23,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/klog/v2"
 	"reflect"
@@ -204,29 +203,6 @@ func (r *HadoopReconciler) generateRuntimeObjects(hadoop *hadoopv1.Hadoop) (runt
 	}
 	klog.V(8).Infof("template: %s", templates)
 	return tools.ParseYaml(templates)
-}
-
-func (r *HadoopReconciler) ensureService(ctx context.Context, h *hadoopv1.Hadoop) error {
-	// create headless service if it doesn't exist
-	foundService := &corev1.Service{}
-	if err := r.Get(ctx, types.NamespacedName{
-		Name:      h.Name,
-		Namespace: h.Namespace,
-	}, foundService); err != nil {
-		if errors.IsNotFound(err) {
-			// Define and create a new headless service.
-			//svc := r.headlessService(hb)
-			//if err := r.Create(context.TODO(), svc); err != nil {
-			//	klog.Error(err, "failed creating service")
-			//	return false, err
-			//}
-			klog.Info("created Hadoop Service")
-			return nil
-		}
-		klog.Error(err, "failed getting service")
-		return err
-	}
-	return nil
 }
 
 func setSpecAnnotation(object *unstructured.Unstructured) (*unstructured.Unstructured, error) {

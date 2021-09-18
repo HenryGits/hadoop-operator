@@ -21,14 +21,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type Phase string
-
-const (
-	Reconciling Phase = "Reconciling"
-	Running     Phase = "Running"
-	Deleting    Phase = "Deleting"
-)
-
 //+genclient
 //+k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 //+kubebuilder:object:root=true
@@ -122,7 +114,7 @@ type NameNode struct {
 	// This should be tuned to fit your workload.
 	// +optional
 	// +kubebuilder:default:={requests: {cpu: "100m", memory: "256Mi"}, limits: {cpu: "500m", memory: "1Gi"}}
-	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
+	Resources Resources `json:"resources,omitempty"`
 	// 反亲和
 	// +optional
 	AntiAffinity corev1.Affinity `json:"affinity,omitempty"`
@@ -138,7 +130,7 @@ type DataNode struct {
 	// This should be tuned to fit your workload.
 	// +optional
 	// +kubebuilder:default:={requests: {cpu: "100m", memory: "256Mi"}, limits: {cpu: "500m", memory: "1Gi"}}
-	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
+	Resources Resources `json:"resources,omitempty"`
 	// 反亲和
 	// +optional
 	AntiAffinity corev1.Affinity `json:"affinity,omitempty"`
@@ -162,7 +154,7 @@ type ResourceManager struct {
 	// This should be tuned to fit your workload.
 	// +optional
 	// +kubebuilder:default:={requests: {cpu: "100m", memory: "256Mi"}, limits: {cpu: "500m", memory: "1Gi"}}
-	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
+	Resources Resources `json:"resources,omitempty"`
 }
 
 type NodeManager struct {
@@ -175,7 +167,7 @@ type NodeManager struct {
 	// This should be tuned to fit your workload.
 	// +optional
 	// +kubebuilder:default:={requests: {cpu: "100m", memory: "256Mi"}, limits: {cpu: "500m", memory: "1Gi"}}
-	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
+	Resources Resources `json:"resources,omitempty"`
 	// ParallelCreate is whether to create all nodeManager statefulset pods in parallel or not (K8S 1.7+)
 	// +optional
 	// +kubebuilder:validation:Enum={true,false}
@@ -188,7 +180,7 @@ type HistoryServer struct {
 	// This should be tuned to fit your workload.
 	// +optional
 	// +kubebuilder:default:={requests: {cpu: "100m", memory: "256Mi"}, limits: {cpu: "500m", memory: "1Gi"}}
-	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
+	Resources Resources `json:"resources,omitempty"`
 	// ParallelCreate is whether to create all nodeManager statefulset pods in parallel or not (K8S 1.7+)
 	// +optional
 	// +kubebuilder:validation:Enum={true,false}

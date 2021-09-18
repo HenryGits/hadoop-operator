@@ -34,6 +34,6 @@ COPY  Hadoop /Hadoop
 
 RUN chmod +x /Hadoop
 
-EXPOSE 9870 9871 8088
+EXPOSE 9870 9871 8088 19888
 
 ENTRYPOINT ["/Hadoop"]

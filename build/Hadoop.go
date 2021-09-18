@@ -24,17 +24,21 @@ var (
 	log   *zap.Logger
 	level zapcore.Level
 
-	nnDir     = flag.String("nnDir", "/usr/local/hadoop/nn", "NameNode Directory")
+	nnDir     = flag.String("NameNodeDir", "/usr/local/hadoop/nn", "NameNode Directory")
 	nnService = flag.Bool("NameNode", false, "是否启动NameNode服务")
 	dnService = flag.Bool("DataNode", false, "是否启动DataNode服务")
+	rmService = flag.Bool("ResourceManager", false, "是否启动ResourceManager服务")
+	nmService = flag.Bool("NodeManager", false, "是否启动NodeManager服务")
+	hsService = flag.Bool("HistoryServer", false, "是否启动HistoryServer服务")
 )
 
 func main() {
 	log = Zap()
 	ctx := context.Background()
-	log.Info("NameNode dirPath: ", zap.String("msg", *nnDir))
+	// Parse command line into the defined flags
+	flag.Parse()
 
-	if *nnDir != "" && *nnService {
+	if *nnService {
 		path, _ := filepath.Abs(*nnDir)
 		// 判断NameNode是否有效
 		files, err := ioutil.ReadDir(path)
@@ -42,26 +46,68 @@ func main() {
 			log.Error("NameNode路径不存在!", zap.Error(err))
 			os.Exit(1)
 		}
+
 		// 判断NameNode是否已被初始化过
-		if files == nil {
-			log.Info("Formatting NameNode name directory: ", zap.String("msg", *nnDir))
-			err := exec.CommandContext(ctx, "$HADOOP_HOME/bin/hdfs namenode -format").Start()
+		if len(files) <= 0 {
+			cmd := exec.CommandContext(ctx, "$HADOOP_HOME/bin/hdfs namenode -format")
+			out, err := cmd.CombinedOutput()
+			log.Info(fmt.Sprintf("===NameNode Init...=== \n%s\n", string(out)))
+
 			if err != nil {
 				log.Error("NameNode初始化失败!", zap.Error(err))
 				os.Exit(1)
 			}
 		}
-		err = exec.CommandContext(ctx, "$HADOOP_HOME/bin/hdfs --daemon start namenode").Start()
+		cmd := exec.CommandContext(ctx, "$HADOOP_HOME/bin/hdfs --daemon start namenode")
+		out, err := cmd.CombinedOutput()
+		log.Info(fmt.Sprintf("===NameNode Service...=== \n%s\n", string(out)))
+
 		if err != nil {
 			log.Error("NameNode启动失败!", zap.Error(err))
 			os.Exit(1)
 		}
 	}
 
-	if dnService != nil {
-		err := exec.CommandContext(ctx, "$HADOOP_HOME/bin/hdfs --daemon start datanode").Start()
+	if *dnService {
+		cmd := exec.CommandContext(ctx, "$HADOOP_HOME/bin/hdfs --daemon start datanode")
+		out, err := cmd.CombinedOutput()
+		log.Info(fmt.Sprintf("===DataNode Service...=== \n%s\n", string(out)))
+
 		if err != nil {
 			log.Error("DataNode启动失败!", zap.Error(err))
+			os.Exit(1)
+		}
+	}
+
+	if *rmService {
+		cmd := exec.CommandContext(ctx, "$HADOOP_HOME/sbin/yarn-daemon.sh start resourcemanager")
+		out, err := cmd.CombinedOutput()
+		log.Info(fmt.Sprintf("===ResourceManager Service...=== \n%s\n", string(out)))
+
+		if err != nil {
+			log.Error("ResourceManager启动失败!", zap.Error(err))
+			os.Exit(1)
+		}
+	}
+
+	if *nmService {
+		cmd := exec.CommandContext(ctx, "$HADOOP_HOME/sbin/yarn-daemon.sh start nodemanager")
+		out, err := cmd.CombinedOutput()
+		log.Info(fmt.Sprintf("===NodeManager Service...=== \n%s\n", string(out)))
+
+		if err != nil {
+			log.Error("NodeManager启动失败!", zap.Error(err))
+			os.Exit(1)
+		}
+	}
+
+	if *hsService {
+		cmd := exec.CommandContext(ctx, "$HADOOP_HOME/sbin/mr-jobhistory-daemon.sh start historyserver")
+		out, err := cmd.CombinedOutput()
+		log.Info(fmt.Sprintf("===HistoryServer Service...=== \n%s\n", string(out)))
+
+		if err != nil {
+			log.Error("HistoryServer启动失败!", zap.Error(err))
 			os.Exit(1)
 		}
 	}
@@ -81,9 +127,9 @@ func main() {
 	signal.Notify(sigterm, syscall.SIGINT, syscall.SIGTERM)
 	select {
 	case <-ctx.Done():
-		fmt.Println("terminating: context cancelled")
+		fmt.Println("Bye: context cancelled")
 	case <-sigterm:
-		fmt.Println("terminating: via signal")
+		fmt.Println("Bye: signal cancelled")
 	}
 }
 
