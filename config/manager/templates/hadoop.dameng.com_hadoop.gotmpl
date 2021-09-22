@@ -82,6 +82,7 @@ data:
         <name>mapreduce.framework.name</name>
         <value>yarn</value>
       </property>
+
       <property>
         <name>mapreduce.jobhistory.address</name>
         <value>{{ $.ObjectMeta.Name }}-resourcemanager-0.{{ $.ObjectMeta.Name }}-resourcemanager.{{ $.ObjectMeta.Namespace }}.svc.cluster.local:10020</value>
@@ -98,80 +99,6 @@ data:
     {{ $.ObjectMeta.Name }}-datanode-{{ $i }}.{{ $.ObjectMeta.Name }}-datanode.{{ $.ObjectMeta.Namespace }}.svc.cluster.local
     {{- end }}
 
-  start-yarn-nm.sh: |
-    #!/usr/bin/env bash
-
-    # Licensed to the Apache Software Foundation (ASF) under one or more
-    # contributor license agreements.  See the NOTICE file distributed with
-    # this work for additional information regarding copyright ownership.
-    # The ASF licenses this file to You under the Apache License, Version 2.0
-    # (the "License"); you may not use this file except in compliance with
-    # the License.  You may obtain a copy of the License at
-    #
-    #     http://www.apache.org/licenses/LICENSE-2.0
-    #
-    # Unless required by applicable law or agreed to in writing, software
-    # distributed under the License is distributed on an "AS IS" BASIS,
-    # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-    # See the License for the specific language governing permissions and
-    # limitations under the License.
-
-
-    # Start all yarn daemons.  Run this on master node.
-
-    echo "starting yarn daemons"
-
-    bin=`dirname "${BASH_SOURCE-$0}"`
-    bin=`cd "$bin"; pwd`
-
-    DEFAULT_LIBEXEC_DIR="$bin"/../libexec
-    HADOOP_LIBEXEC_DIR=${HADOOP_LIBEXEC_DIR:-$DEFAULT_LIBEXEC_DIR}
-    . $HADOOP_LIBEXEC_DIR/yarn-config.sh
-
-    # start resourceManager
-    # "$bin"/yarn-daemon.sh --config $YARN_CONF_DIR  start resourcemanager
-    # start nodeManager
-    "$bin"/yarn-daemon.sh --config $YARN_CONF_DIR  start nodemanager
-    # start proxyserver
-    #"$bin"/yarn-daemon.sh --config $YARN_CONF_DIR  start proxyserver
-
-  start-yarn-rm.sh: |
-    #!/usr/bin/env bash
-
-    # Licensed to the Apache Software Foundation (ASF) under one or more
-    # contributor license agreements.  See the NOTICE file distributed with
-    # this work for additional information regarding copyright ownership.
-    # The ASF licenses this file to You under the Apache License, Version 2.0
-    # (the "License"); you may not use this file except in compliance with
-    # the License.  You may obtain a copy of the License at
-    #
-    #     http://www.apache.org/licenses/LICENSE-2.0
-    #
-    # Unless required by applicable law or agreed to in writing, software
-    # distributed under the License is distributed on an "AS IS" BASIS,
-    # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-    # See the License for the specific language governing permissions and
-    # limitations under the License.
-
-
-    # Start all yarn daemons.  Run this on master node.
-
-    echo "starting yarn daemons"
-
-    bin=`dirname "${BASH_SOURCE-$0}"`
-    bin=`cd "$bin"; pwd`
-
-    DEFAULT_LIBEXEC_DIR="$bin"/../libexec
-    HADOOP_LIBEXEC_DIR=${HADOOP_LIBEXEC_DIR:-$DEFAULT_LIBEXEC_DIR}
-    . $HADOOP_LIBEXEC_DIR/yarn-config.sh
-
-    # start resourceManager
-    "$bin"/yarn-daemon.sh --config $YARN_CONF_DIR  start resourcemanager
-    # start nodeManager
-    # "$bin"/yarn-daemons.sh --config $YARN_CONF_DIR  start nodemanager
-    # start proxyserver
-    "$bin"/yarn-daemon.sh --config $YARN_CONF_DIR  start proxyserver
-
   yarn-site.xml: |
     <?xml version="1.0"?>
     <?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
@@ -179,7 +106,7 @@ data:
     <configuration>
       <property>
         <name>yarn.resourcemanager.hostname</name>
-        <value>{{ $.ObjectMeta.Name }}-resourcemanager</value>
+        <value>{{ $.ObjectMeta.Name }}-resourcemanager-0</value>
       </property>
 
       <!-- Bind to all interfaces -->
@@ -208,6 +135,18 @@ data:
       </property>
 
       <property>
+        <name>yarn.nodemanager.localizer.address</name>
+        <value>{{ $.ObjectMeta.Name }}-nodemanager.{{ $.ObjectMeta.Namespace }}.svc.cluster.local:8040</value>
+        <description>Address where the localizer IPC is.</description>
+      </property>
+
+      <property>
+        <name>yarn.nodemanager.webapp.address</name>
+        <value>{{ $.ObjectMeta.Name }}-nodemanager.{{ $.ObjectMeta.Namespace }}.svc.cluster.local:8042</value>
+        <description>NodeManager Webapp address</description>
+      </property>
+
+      <property>
         <name>yarn.nodemanager.aux-services.mapreduce_shuffle.class</name>
         <value>org.apache.hadoop.mapred.ShuffleHandler</value>
       </property>
@@ -231,6 +170,28 @@ data:
       </property>
 
       <property>
+        <name>yarn.resourcemanager.address</name>
+        <value>{{ $.ObjectMeta.Name }}-resourcemanager.{{ $.ObjectMeta.Namespace }}.svc.cluster.local:8032</value>
+        <description>RM对客户端暴露的地址，客户端通过该地址向RM提交应用程序等</description>
+      </property>
+      <property>
+        <name>yarn.resourcemanager.scheduler.address</name>
+        <value>{{ $.ObjectMeta.Name }}-resourcemanager.{{ $.ObjectMeta.Namespace }}.svc.cluster.local:8034</value>
+        <description>RM对AM暴露的地址，AM通过地址想RM申请资源，释放资源等</description>
+      </property>
+      <property>
+        <name>yarn.resourcemanager.webapp.address</name>
+        <value>{{ $.ObjectMeta.Name }}-resourcemanager.{{ $.ObjectMeta.Namespace }}.svc.cluster.local:8088</value>
+        <description>resourcemanager webapp address</description>
+      </property>
+      <property>
+        <name>yarn.resourcemanager.resource-tracker.address</name>
+        <value>{{ $.ObjectMeta.Name }}-resourcemanager.{{ $.ObjectMeta.Namespace }}.svc.cluster.local:8031</value>
+        <description>RM对NM暴露地址，NM通过该地址向RM汇报心跳，领取任务等</description>
+      </property>
+
+
+      <property>
         <name>yarn.application.classpath</name>
         <value>
           /usr/local/hadoop/etc/hadoop,
@@ -246,8 +207,63 @@ data:
       </property>
     </configuration>
 
+  capacity-scheduler.xml: |
+    <configuration>
+      <property>
+        <name>yarn.scheduler.capacity.root.queues</name>
+        <value>default</value>
+        <description>
+          The queues at the this level (root is the root queue).
+        </description>
+      </property>
 
+      <property>
+        <name>yarn.scheduler.capacity.root.default.capacity</name>
+        <value>100</value>
+        <description>Default queue target capacity.</description>
+      </property>
 
+      <property>
+        <name>yarn.scheduler.capacity.root.default.user-limit-factor</name>
+        <value>1</value>
+        <description>
+          Default queue user limit a percentage from 0.0 to 1.0.
+        </description>
+      </property>
+
+      <property>
+        <name>yarn.scheduler.capacity.root.default.maximum-capacity</name>
+        <value>100</value>
+        <description>
+          The maximum capacity of the default queue.
+        </description>
+      </property>
+
+      <property>
+        <name>yarn.scheduler.capacity.root.default.acl_submit_applications</name>
+        <value>*</value>
+        <description>
+          The ACL of who can submit jobs to the default queue.
+        </description>
+      </property>
+
+      <property>
+        <name>yarn.scheduler.capacity.root.default.acl_administer_queue</name>
+        <value>*</value>
+        <description>
+          The ACL of who can administer jobs on the default queue.
+        </description>
+      </property>
+
+      <property>
+        <name>yarn.scheduler.capacity.root.default.acl_application_max_priority</name>
+        <value>*</value>
+        <description>
+          The ACL of who can submit applications with configured priority.
+          For e.g, [user={name} group={name} max_priority={priority} default_priority={priority}]
+        </description>
+      </property>
+    </configuration>
 
 
 ---
@@ -280,15 +296,15 @@ spec:
         operator.dameng.com/id: {{ $.Spec.ID | quote }}
         sidecar.istio.io/inject: "false"
     spec:
+      nodeSelector:
+        app: datanode
       affinity:
         podAntiAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
-            - topologyKey: "kubernetes.io/hostname"
-              labelSelector:
+            - labelSelector:
                 matchLabels:
-                  app: dn
-                  release: dn
-                  component: dn
+                  app: {{ $.ObjectMeta.Name }}-datanode
+              topologyKey: "kubernetes.io/hostname"
       terminationGracePeriodSeconds: 0
       containers:
         - name: {{ $.ObjectMeta.Name }}-datanode
@@ -320,7 +336,7 @@ spec:
             name: {{ $.ObjectMeta.Name }}
         - name: dfs
           hostPath:
-            # Ensure the file directory is created.
+            # Ensure the file DirectoryOrCreate is created.
             path: /home/data/dn
             type: DirectoryOrCreate
 
@@ -398,20 +414,23 @@ spec:
         operator.dameng.com/id: {{ $.Spec.ID | quote }}
         sidecar.istio.io/inject: "false"
     spec:
+      nodeSelector:
+        app: namenode
       affinity:
         podAntiAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
-            - topologyKey: "kubernetes.io/hostname"
-              labelSelector:
+            - labelSelector:
                 matchLabels:
-                  app: {{ $.ObjectMeta.Name }}-namenode
-                  release: {{ $.ObjectMeta.Name }}-namenode
-                  component: {{ $.ObjectMeta.Name }}-namenode
+                  app: namenode
+              topologyKey: "kubernetes.io/hostname"
       terminationGracePeriodSeconds: 0
       containers:
         - name: {{ $.ObjectMeta.Name }}-namenode
           image: "{{ $.Spec.Container.Image }}"
           imagePullPolicy: {{ $.Spec.Container.PullPolicy | quote }}
+          ports:
+            - containerPort: 9870
+              name: webhdfs
           args:
             - "--NameNode"
             - "--NameNodeDir=$(HDFS_NAME_NODE_DIR)"
@@ -444,7 +463,7 @@ spec:
             name: {{ $.ObjectMeta.Name }}
         - name: dfs
           hostPath:
-            # Ensure the file directory is created.
+            # Ensure the file DirectoryOrCreate is created.
             path: /home/data/nn
             type: DirectoryOrCreate
 
@@ -480,13 +499,14 @@ metadata:
     component: {{ $.ObjectMeta.Name }}-namenode
     operator.dameng.com/id: {{ $.Spec.ID | quote }}
 spec:
+  type: NodePort
   ports:
     - name: dfs
       port: 9000
       protocol: TCP
     - name: webhdfs
       port: 9870
-  clusterIP: None
+#  clusterIP: None
   selector:
     app: {{ $.ObjectMeta.Name }}-namenode
     release: {{ $.ObjectMeta.Name }}-namenode
@@ -523,15 +543,15 @@ spec:
         operator.dameng.com/id: {{ $.Spec.ID | quote }}
         sidecar.istio.io/inject: "false"
     spec:
+      nodeSelector:
+        app: namenode
       affinity:
         podAntiAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
-            - topologyKey: "kubernetes.io/hostname"
-              labelSelector:
+            - labelSelector:
                 matchLabels:
-                  app: {{ $.ObjectMeta.Name }}-resourcemanager
-                  release: {{ $.ObjectMeta.Name }}-resourcemanager
-                  component: {{ $.ObjectMeta.Name }}-resourcemanager
+                  app: namenode
+              topologyKey: "kubernetes.io/hostname"
       terminationGracePeriodSeconds: 0
       containers:
         - name: {{ $.ObjectMeta.Name }}-resourcemanager
@@ -540,28 +560,34 @@ spec:
           ports:
             - containerPort: 8088
               name: web
+            - containerPort: 8031
+              name: tracker
+            - containerPort: 8032
+              name: rm-client
+            - containerPort: 8034
+              name: scheduler
           args:
             - "--ResourceManager"
 {{ parseResources $.Spec.ResourceManager.Resources | indent 10 }}
-          readinessProbe:
-            httpGet:
-              path: /ws/v1/cluster/info
-              port: 8088
-            initialDelaySeconds: 5
-            timeoutSeconds: 2
-          livenessProbe:
-            httpGet:
-              path: /ws/v1/cluster/info
-              port: 8088
-            initialDelaySeconds: 10
-            timeoutSeconds: 2
           volumeMounts:
             - name: hadoop-config
               mountPath: /usr/local/hadoop/etc/hadoop
+            - name: nn
+              mountPath: /usr/local/hadoop/nn
+            - name: dn
+              mountPath: /usr/local/hadoop/dn
       volumes:
         - name: hadoop-config
           configMap:
             name: {{ $.ObjectMeta.Name }}
+        - name: nn
+          hostPath:
+            path: /home/data/nn
+            type: DirectoryOrCreate
+        - name: dn
+          hostPath:
+            path: /home/data/dn
+            type: DirectoryOrCreate
 
 
 ---
@@ -596,10 +622,17 @@ metadata:
     component: {{ $.ObjectMeta.Name }}-resourcemanager
     operator.dameng.com/id: {{ $.Spec.ID | quote }}
 spec:
+  type: NodePort
   ports:
     - port: 8088
       name: web
-  clusterIP: None
+    - port: 8031
+      name: tracker
+    - port: 8032
+      name: rm-client
+    - port: 8034
+      name: scheduler
+#  clusterIP: None
   selector:
     app: {{ $.ObjectMeta.Name }}-resourcemanager
     release: {{ $.ObjectMeta.Name }}-resourcemanager
@@ -641,23 +674,25 @@ spec:
         operator.dameng.com/id: {{ $.Spec.ID | quote }}
         sidecar.istio.io/inject: "false"
     spec:
+      nodeSelector:
+        app: datanode
       affinity:
         podAntiAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
-            - topologyKey: "kubernetes.io/hostname"
-              labelSelector:
+            - labelSelector:
                 matchLabels:
-                  app: {{ $.ObjectMeta.Name }}-nodemanager
-                  release: {{ $.ObjectMeta.Name }}-nodemanager
-                  component: {{ $.ObjectMeta.Name }}-nodemanager
+                  app: datanode
+              topologyKey: "kubernetes.io/hostname"
       terminationGracePeriodSeconds: 0
       containers:
         - name: {{ $.ObjectMeta.Name }}-nodemanager
           image: "{{ $.Spec.Container.Image }}"
           imagePullPolicy: {{ $.Spec.Container.PullPolicy | quote }}
           ports:
-            - containerPort: 8088
-              name: web
+            - containerPort: 8040
+              name: localizer
+            - containerPort: 8042
+              name: webapp
           args:
             - "--NodeManager"
           securityContext:
@@ -693,13 +728,21 @@ spec:
           volumeMounts:
             - name: hadoop-config
               mountPath: /usr/local/hadoop/etc/hadoop
+            - name: nn
+              mountPath: /usr/local/hadoop/nn
+            - name: dn
+              mountPath: /usr/local/hadoop/dn
       volumes:
         - name: hadoop-config
           configMap:
             name: {{ $.ObjectMeta.Name }}
-        - name: nn-dir
+        - name: nn
           hostPath:
             path: /home/data/nn
+            type: DirectoryOrCreate
+        - name: dn
+          hostPath:
+            path: /home/data/dn
             type: DirectoryOrCreate
 
 
@@ -736,60 +779,15 @@ metadata:
     operator.dameng.com/id: {{ $.Spec.ID | quote }}
 spec:
   ports:
-    - port: 8088
-      name: web
-    - port: 8082
-      name: web2
+    - port: 8040
+      name: localizer
     - port: 8042
-      name: api
+      name: webapp
   clusterIP: None
   selector:
     app: {{ $.ObjectMeta.Name }}-nodemanager
     release: {{ $.ObjectMeta.Name }}-nodemanager
     component: {{ $.ObjectMeta.Name }}-nodemanager
-
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: {{ $.ObjectMeta.Name }}-hdfs-ui
-  labels:
-    app: {{ $.ObjectMeta.Name }}-hdfs-ui
-    chart: hadoop-1.1.4
-    release: {{ $.ObjectMeta.Name }}
-    component: {{ $.ObjectMeta.Name }}-hdfs-ui
-    operator.dameng.com/id: {{ $.Spec.ID | quote }}
-spec:
-  type: NodePort
-  ports:
-    - port: 9870
-      name: web
-  selector:
-    app: {{ $.ObjectMeta.Name }}-hdfs-ui
-    release: {{ $.ObjectMeta.Name }}-hdfs-ui
-    component: {{ $.ObjectMeta.Name }}-hdfs-ui
-
-
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: {{ $.ObjectMeta.Name }}-yarn-ui
-  labels:
-    app: {{ $.ObjectMeta.Name }}-yarn-ui
-    chart: hadoop-1.1.4
-    release: {{ $.ObjectMeta.Name }}
-    component: {{ $.ObjectMeta.Name }}-yarn-ui
-    operator.dameng.com/id: {{ $.Spec.ID | quote }}
-spec:
-  type: NodePort
-  ports:
-    - port: 8088
-      name: web
-  selector:
-    app: {{ $.ObjectMeta.Name }}-yarn-ui
-    release: {{ $.ObjectMeta.Name }}-yarn-ui
-    component: {{ $.ObjectMeta.Name }}-yarn-ui
 
 
 
@@ -851,13 +849,21 @@ spec:
           volumeMounts:
             - name: hadoop-config
               mountPath: /usr/local/hadoop/etc/hadoop
+            - name: nn
+              mountPath: /usr/local/hadoop/nn
+            - name: dn
+              mountPath: /usr/local/hadoop/dn
       volumes:
         - name: hadoop-config
           configMap:
             name: {{ $.ObjectMeta.Name }}
-        - name: nn-dir
+        - name: nn
           hostPath:
             path: /home/data/nn
+            type: DirectoryOrCreate
+        - name: dn
+          hostPath:
+            path: /home/data/dn
             type: DirectoryOrCreate
 
 
