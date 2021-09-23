@@ -90,11 +90,11 @@ data:
 
       <property>
         <name>mapreduce.jobhistory.address</name>
-        <value>{{ $.ObjectMeta.Name }}-resourcemanager-0.{{ $.ObjectMeta.Name }}-resourcemanager.{{ $.ObjectMeta.Namespace }}.svc.cluster.local:10020</value>
+        <value>{{ $.ObjectMeta.Name }}-resourcemanager.{{ $.ObjectMeta.Namespace }}.svc.cluster.local:10020</value>
       </property>
       <property>
         <name>mapreduce.jobhistory.webapp.address</name>
-        <value>{{ $.ObjectMeta.Name }}-resourcemanager-0.{{ $.ObjectMeta.Name }}-resourcemanager.{{ $.ObjectMeta.Namespace }}.svc.cluster.local:19888</value>
+        <value>{{ $.ObjectMeta.Name }}-resourcemanager.{{ $.ObjectMeta.Namespace }}.svc.cluster.local:19888</value>
       </property>
     </configuration>
 
@@ -111,7 +111,7 @@ data:
     <configuration>
       <property>
         <name>yarn.resourcemanager.hostname</name>
-        <value>{{ $.ObjectMeta.Name }}-resourcemanager-0</value>
+        <value>{{ $.ObjectMeta.Name }}-resourcemanager</value>
       </property>
 
       <!-- Bind to all interfaces -->
@@ -859,6 +859,8 @@ spec:
           image: "{{ $.Spec.Container.Image }}"
           imagePullPolicy: {{ $.Spec.Container.PullPolicy | quote }}
           ports:
+            - containerPort: 10020
+              name: jobhistory
             - containerPort: 19888
               name: web
           args:
@@ -919,6 +921,8 @@ metadata:
     operator.dameng.com/id: {{ $.Spec.ID | quote }}
 spec:
   ports:
+    - port: 10020
+      name: jobhistory
     - port: 19888
       name: web
   clusterIP: None
