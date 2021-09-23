@@ -17,6 +17,11 @@ data:
         <value>hdfs://{{ $.ObjectMeta.Name }}-namenode:9000/</value>
         <description>NameNode URI</description>
       </property>
+      <property>
+        <name>ha.zookeeper.quorum</name>
+        <value>zookeeper-headless.system.svc.cluster.local:2181</value>
+        <description>配置Zookeeper 管理HDFS</description>
+      </property>
     </configuration>
   hdfs-site.xml: |
     <?xml version="1.0"?>
@@ -188,6 +193,21 @@ data:
         <name>yarn.resourcemanager.resource-tracker.address</name>
         <value>{{ $.ObjectMeta.Name }}-resourcemanager.{{ $.ObjectMeta.Namespace }}.svc.cluster.local:8031</value>
         <description>RM对NM暴露地址，NM通过该地址向RM汇报心跳，领取任务等</description>
+      </property>
+
+      <property>
+        <name>yarn.resourcemanager.zk.state-store.address</name>
+        <value>zookeeper-headless.system.svc.cluster.local:2181</value>
+        <description>配置Zookeeper地址</description>
+      </property>
+      <property>
+        <name>yarn.resourcemanager.zk-address</name>
+        <value>zookeeper-headless.system.svc.cluster.local:2181</value>
+      </property>
+      <property>
+        <name>yarn.resourcemanager.store.class</name>
+        <value>org.apache.hadoop.yarn.server.resourcemanager.recovery.ZKRMStateStore</value>
+        <description>指定resourcemanager的状态信息存储在zookeeper集群，默认是存放在FileSystem里面</description>
       </property>
 
 
