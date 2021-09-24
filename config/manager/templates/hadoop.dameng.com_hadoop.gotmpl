@@ -227,65 +227,6 @@ data:
       </property>
     </configuration>
 
-  capacity-scheduler.xml: |
-    <configuration>
-      <property>
-        <name>yarn.scheduler.capacity.root.queues</name>
-        <value>default</value>
-        <description>
-          The queues at the this level (root is the root queue).
-        </description>
-      </property>
-
-      <property>
-        <name>yarn.scheduler.capacity.root.default.capacity</name>
-        <value>100</value>
-        <description>Default queue target capacity.</description>
-      </property>
-
-      <property>
-        <name>yarn.scheduler.capacity.root.default.user-limit-factor</name>
-        <value>1</value>
-        <description>
-          Default queue user limit a percentage from 0.0 to 1.0.
-        </description>
-      </property>
-
-      <property>
-        <name>yarn.scheduler.capacity.root.default.maximum-capacity</name>
-        <value>100</value>
-        <description>
-          The maximum capacity of the default queue.
-        </description>
-      </property>
-
-      <property>
-        <name>yarn.scheduler.capacity.root.default.acl_submit_applications</name>
-        <value>*</value>
-        <description>
-          The ACL of who can submit jobs to the default queue.
-        </description>
-      </property>
-
-      <property>
-        <name>yarn.scheduler.capacity.root.default.acl_administer_queue</name>
-        <value>*</value>
-        <description>
-          The ACL of who can administer jobs on the default queue.
-        </description>
-      </property>
-
-      <property>
-        <name>yarn.scheduler.capacity.root.default.acl_application_max_priority</name>
-        <value>*</value>
-        <description>
-          The ACL of who can submit applications with configured priority.
-          For e.g, [user={name} group={name} max_priority={priority} default_priority={priority}]
-        </description>
-      </property>
-    </configuration>
-
-
 ---
 apiVersion: apps/v1
 kind: StatefulSet
@@ -347,7 +288,20 @@ spec:
             timeoutSeconds: 2
           volumeMounts:
             - name: hadoop-config
-              mountPath: /usr/local/hadoop/etc/hadoop
+              mountPath: /usr/local/hadoop/etc/hadoop/core-site.xml
+              subPath: core-site.xml
+            - name: hadoop-config
+              mountPath: /usr/local/hadoop/etc/hadoop/hdfs-site.xml
+              subPath: hdfs-site.xml
+            - name: hadoop-config
+              mountPath: /usr/local/hadoop/etc/hadoop/mapred-site.xml
+              subPath: mapred-site.xml
+            - name: hadoop-config
+              mountPath: /usr/local/hadoop/etc/hadoop/workers
+              subPath: workers
+            - name: hadoop-config
+              mountPath: /usr/local/hadoop/etc/hadoop/yarn-site.xml
+              subPath: yarn-site.xml
             - name: dfs
               mountPath: /usr/local/hadoop/dn
       volumes:
@@ -474,7 +428,20 @@ spec:
             timeoutSeconds: 2
           volumeMounts:
             - name: hadoop-config
-              mountPath: /usr/local/hadoop/etc/hadoop
+              mountPath: /usr/local/hadoop/etc/hadoop/core-site.xml
+              subPath: core-site.xml
+            - name: hadoop-config
+              mountPath: /usr/local/hadoop/etc/hadoop/hdfs-site.xml
+              subPath: hdfs-site.xml
+            - name: hadoop-config
+              mountPath: /usr/local/hadoop/etc/hadoop/mapred-site.xml
+              subPath: mapred-site.xml
+            - name: hadoop-config
+              mountPath: /usr/local/hadoop/etc/hadoop/workers
+              subPath: workers
+            - name: hadoop-config
+              mountPath: /usr/local/hadoop/etc/hadoop/yarn-site.xml
+              subPath: yarn-site.xml
             - name: dfs
               mountPath: /usr/local/hadoop/nn
       volumes:
@@ -504,7 +471,7 @@ spec:
       app: {{ $.ObjectMeta.Name }}-namenode
       release: {{ $.ObjectMeta.Name }}-namenode
       component: {{ $.ObjectMeta.Name }}-namenode
-  minAvailable: {{ $.Spec.Hdfs.NameNode.PdbMinAvailable }}
+  maxUnavailable: 3
 
 
 ---
@@ -591,7 +558,20 @@ spec:
 {{ parseResources $.Spec.ResourceManager.Resources | indent 10 }}
           volumeMounts:
             - name: hadoop-config
-              mountPath: /usr/local/hadoop/etc/hadoop
+              mountPath: /usr/local/hadoop/etc/hadoop/core-site.xml
+              subPath: core-site.xml
+            - name: hadoop-config
+              mountPath: /usr/local/hadoop/etc/hadoop/hdfs-site.xml
+              subPath: hdfs-site.xml
+            - name: hadoop-config
+              mountPath: /usr/local/hadoop/etc/hadoop/mapred-site.xml
+              subPath: mapred-site.xml
+            - name: hadoop-config
+              mountPath: /usr/local/hadoop/etc/hadoop/workers
+              subPath: workers
+            - name: hadoop-config
+              mountPath: /usr/local/hadoop/etc/hadoop/yarn-site.xml
+              subPath: yarn-site.xml
             - name: nn
               mountPath: /usr/local/hadoop/nn
             - name: dn
@@ -627,7 +607,7 @@ spec:
       app: {{ $.ObjectMeta.Name }}-resourcemanager
       release: {{ $.ObjectMeta.Name }}-resourcemanager
       component: {{ $.ObjectMeta.Name }}-resourcemanager
-  minAvailable: 1
+  maxUnavailable: 1
 
 
 ---
@@ -747,7 +727,20 @@ spec:
               value: "/usr/local/hadoop/nn"
           volumeMounts:
             - name: hadoop-config
-              mountPath: /usr/local/hadoop/etc/hadoop
+              mountPath: /usr/local/hadoop/etc/hadoop/core-site.xml
+              subPath: core-site.xml
+            - name: hadoop-config
+              mountPath: /usr/local/hadoop/etc/hadoop/hdfs-site.xml
+              subPath: hdfs-site.xml
+            - name: hadoop-config
+              mountPath: /usr/local/hadoop/etc/hadoop/mapred-site.xml
+              subPath: mapred-site.xml
+            - name: hadoop-config
+              mountPath: /usr/local/hadoop/etc/hadoop/workers
+              subPath: workers
+            - name: hadoop-config
+              mountPath: /usr/local/hadoop/etc/hadoop/yarn-site.xml
+              subPath: yarn-site.xml
             - name: nn
               mountPath: /usr/local/hadoop/nn
             - name: dn
@@ -870,7 +863,20 @@ spec:
 {{ parseResources $.Spec.NodeManager.Resources | indent 10 }}
           volumeMounts:
             - name: hadoop-config
-              mountPath: /usr/local/hadoop/etc/hadoop
+              mountPath: /usr/local/hadoop/etc/hadoop/core-site.xml
+              subPath: core-site.xml
+            - name: hadoop-config
+              mountPath: /usr/local/hadoop/etc/hadoop/hdfs-site.xml
+              subPath: hdfs-site.xml
+            - name: hadoop-config
+              mountPath: /usr/local/hadoop/etc/hadoop/mapred-site.xml
+              subPath: mapred-site.xml
+            - name: hadoop-config
+              mountPath: /usr/local/hadoop/etc/hadoop/workers
+              subPath: workers
+            - name: hadoop-config
+              mountPath: /usr/local/hadoop/etc/hadoop/yarn-site.xml
+              subPath: yarn-site.xml
             - name: nn
               mountPath: /usr/local/hadoop/nn
             - name: dn
