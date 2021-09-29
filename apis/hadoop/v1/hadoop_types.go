@@ -105,11 +105,10 @@ type Hdfs struct {
 }
 
 type NameNode struct {
-	// PdbMinAvailable is the minimum available number of PodDisruptionBudget for Hadoop component
+	// Replicas is the minimum available number of PodDisruptionBudget for Hadoop component
 	// +optional
-	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:default=1
-	PdbMinAvailable *int32 `json:"pdbMinAvailable,omitempty"`
+	Replicas *int32 `json:"replicas,omitempty"`
 	// Resources is the CPU and memory resource (requests and limits) allocated to each Hadoop component pod.
 	// This should be tuned to fit your workload.
 	// +optional
@@ -121,11 +120,9 @@ type NameNode struct {
 }
 
 type DataNode struct {
-	// PdbMinAvailable is the minimum available number of PodDisruptionBudget for Hadoop component
 	// +optional
-	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:default=1
-	PdbMinAvailable *int32 `json:"pdbMinAvailable,omitempty"`
+	Replicas *int32 `json:"replicas,omitempty"`
 	// Resources is the CPU and memory resource (requests and limits) allocated to each Hadoop component pod.
 	// This should be tuned to fit your workload.
 	// +optional
@@ -145,11 +142,9 @@ type WebHdfs struct {
 }
 
 type ResourceManager struct {
-	// PdbMinAvailable is the minimum available number of PodDisruptionBudget for Hadoop component
 	// +optional
-	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:default=1
-	PdbMinAvailable *int32 `json:"pdbMinAvailable,omitempty"`
+	Replicas *int32 `json:"replicas,omitempty"`
 	// Resources is the CPU and memory resource (requests and limits) allocated to each Hadoop component pod.
 	// This should be tuned to fit your workload.
 	// +optional
@@ -158,11 +153,9 @@ type ResourceManager struct {
 }
 
 type NodeManager struct {
-	// PdbMinAvailable is the minimum available number of PodDisruptionBudget for Hadoop component
 	// +optional
-	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:default=1
-	PdbMinAvailable *int32 `json:"pdbMinAvailable,omitempty"`
+	Replicas *int32 `json:"replicas,omitempty"`
 	// Resources is the CPU and memory resource (requests and limits) allocated to each Hadoop component pod.
 	// This should be tuned to fit your workload.
 	// +optional

@@ -12,11 +12,19 @@ data:
     <?xml version="1.0"?>
     <?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
     <configuration>
+    {{- $count := $.Spec.Hdfs.NameNode.Replicas | int -}}
+    {{- if gt $count 1}}
+      <property>
+        <name>fs.defaultFS</name>
+        <value>hdfs://nameservice1</value>
+      </property>
+    {{- else }}
       <property>
         <name>fs.defaultFS</name>
         <value>hdfs://hadoop-namenode.{{ $.ObjectMeta.Namespace }}.svc.cluster.local:9000/</value>
         <description>NameNode URI</description>
       </property>
+    {{- end }}
       <property>
         <name>ha.zookeeper.quorum</name>
         <value>zookeeper-headless.system.svc.cluster.local:2181</value>
@@ -28,12 +36,12 @@ data:
     <?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
     <configuration>
 
-    {{- if $.Spec.WebHdfs.Enabled -}}
+    {{- if $.Spec.WebHdfs.Enabled}}
       <property>
           <name>dfs.webhdfs.enabled</name>
           <value>true</value>
       </property>
-    {{- end -}}
+    {{- end}}
 
       <property>
         <name>dfs.datanode.use.datanode.hostname</name>
@@ -43,6 +51,11 @@ data:
       <property>
         <name>dfs.client.use.datanode.hostname</name>
         <value>false</value>
+      </property>
+
+      <property>
+       <name>dfs.permissions</name>
+       <value>false</value>
       </property>
 
       <property>
@@ -76,6 +89,54 @@ data:
         <value>0.0.0.0</value>
       </property>
       <!-- /Bind to all interfaces -->
+
+    {{- $count := $.Spec.Hdfs.NameNode.Replicas | int -}}
+    {{- if gt $count 1}}
+      <property>
+        <name>dfs.nameservices</name>
+        <value>nameservice1</value>
+      </property>
+
+      <property>
+        <name>dfs.ha.namenodes.nameservice1</name>
+        <value>{{- range $i := until (int (.Spec.Hdfs.NameNode.Replicas)) -}}hadoop-namenode-{{ $i }}.{{ $.ObjectMeta.Namespace }}.svc.cluster.local{{- if  lt $i (sub $count 1)  -}},{{- end -}}{{- end -}}</value>
+      </property>
+
+    {{- range $i := until (int (.Spec.Hdfs.NameNode.Replicas)) }}
+       <property>
+         <name>dfs.namenode.rpc-address.nameservice1.hadoop-namenode-{{ $i }}</name>
+         <value>hadoop-namenode-{{ $i }}.{{ $.ObjectMeta.Namespace }}.svc.cluster.local:9000</value>
+       </property>
+       <property>
+         <name>dfs.namenode.http-address.nameservice1.hadoop-namenode-{{ $i }}</name>
+         <value>hadoop-namenode-{{ $i }}.{{ $.ObjectMeta.Namespace }}.svc.cluster.local:9870</value>
+       </property>
+     {{- end }}
+
+        <!-- 指定NameNode的元数据在JournalNode上的存放位置 -->
+       <property>
+         <name>dfs.namenode.shared.edits.dir</name>
+         <value>qjournal://{{- range $i := until (int (.Spec.Hdfs.NameNode.Replicas)) -}}hadoop-namenode-{{ $i }}.{{ $.ObjectMeta.Namespace }}.svc.cluster.local:8485{{- if  lt $i (sub $count 1)  -}};{{- end -}}{{- end -}}/nameservice1</value>
+       </property>
+
+       <!-- 指定JournalNode在本地磁盘存放数据的位置 -->
+       <property>
+         <name>dfs.journalnode.edits.dir</name>
+         <value>/usr/local/hadoop/journalData</value>
+       </property>
+
+       <!-- 开启NameNode失败自动切换 -->
+       <property>
+         <name>dfs.ha.automatic-failover.enabled</name>
+         <value>true</value>
+       </property>
+
+       <!-- 配置失败自动切换实现方式 -->
+       <property>
+         <name>dfs.client.failover.proxy.provider.nameservice1</name>
+         <value>org.apache.hadoop.hdfs.server.namenode.ha.ConfiguredFailoverProxyProvider</value>
+       </property>
+    {{- end}}
     </configuration>
 
   mapred-site.xml: |
@@ -99,7 +160,7 @@ data:
     </configuration>
 
   workers: |
-    {{- $count := $.Spec.Hdfs.DataNode.PdbMinAvailable | int -}}
+    {{- $count := $.Spec.Hdfs.DataNode.Replicas | int -}}
     {{- range $i, $e := until $count }}
     {{ $.ObjectMeta.Name }}-datanode-{{ $i }}.hadoop-datanode.{{ $.ObjectMeta.Namespace }}.svc.cluster.local
     {{- end }}
@@ -242,7 +303,7 @@ metadata:
     operator.dameng.com/title: {{ $.Spec.Title | hexenc | quote }}
 spec:
   serviceName: {{ $.ObjectMeta.Name }}-datanode
-  replicas: {{ $.Spec.Hdfs.DataNode.PdbMinAvailable }}
+  replicas: {{ $.Spec.Hdfs.DataNode.Replicas }}
   selector:
     matchLabels:
       app: {{ $.ObjectMeta.Name }}-datanode
@@ -332,7 +393,7 @@ spec:
       app: hadoop
       release: {{ $.ObjectMeta.Name }}
       component: hdfs-dn
-  minAvailable: {{ $.Spec.Hdfs.DataNode.PdbMinAvailable }}
+  minAvailable: {{ $.Spec.Hdfs.DataNode.Replicas }}
 
 ---
 apiVersion: v1
@@ -373,7 +434,7 @@ metadata:
     operator.dameng.com/title: {{ $.Spec.Title | hexenc | quote }}
 spec:
   serviceName: {{ $.ObjectMeta.Name }}-namenode
-  replicas: {{ $.Spec.Hdfs.NameNode.PdbMinAvailable }}
+  replicas: {{ $.Spec.Hdfs.NameNode.Replicas }}
   selector:
     matchLabels:
       app: {{ $.ObjectMeta.Name }}-namenode
@@ -474,11 +535,17 @@ spec:
   maxUnavailable: 3
 
 
+{{- $count := $.Spec.Hdfs.NameNode.Replicas | int -}}
+{{- range $i := until (int (.Spec.Hdfs.NameNode.Replicas)) }}
 ---
 apiVersion: v1
 kind: Service
 metadata:
+  {{- if gt $count 1 }}
+  name: hadoop-namenode-{{ $i }}
+  {{- else }}
   name: hadoop-namenode
+  {{- end }}
   labels:
     app: {{ $.ObjectMeta.Name }}-namenode
     chart: hadoop-1.1.4
@@ -498,7 +565,7 @@ spec:
     app: {{ $.ObjectMeta.Name }}-namenode
     release: {{ $.ObjectMeta.Name }}-namenode
     component: {{ $.ObjectMeta.Name }}-namenode
-
+{{- end }}
 
 ---
 apiVersion: apps/v1
@@ -656,7 +723,7 @@ metadata:
     operator.dameng.com/title: {{ $.Spec.Title | hexenc | quote }}
 spec:
   serviceName: {{ $.ObjectMeta.Name }}-nodemanager
-  replicas: {{ $.Spec.NodeManager.PdbMinAvailable }}
+  replicas: {{ $.Spec.NodeManager.Replicas }}
   selector:
     matchLabels:
       app: {{ $.ObjectMeta.Name }}-nodemanager
@@ -777,7 +844,7 @@ spec:
       app: {{ $.ObjectMeta.Name }}-nodemanager
       release: {{ $.ObjectMeta.Name }}-nodemanager
       component: {{ $.ObjectMeta.Name }}-nodemanager
-  minAvailable: {{ $.Spec.NodeManager.PdbMinAvailable }}
+  minAvailable: {{ $.Spec.NodeManager.Replicas }}
 
 ---
 apiVersion: v1
