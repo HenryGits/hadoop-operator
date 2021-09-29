@@ -14,7 +14,7 @@ data:
     <configuration>
       <property>
         <name>fs.defaultFS</name>
-        <value>hdfs://{{ $.ObjectMeta.Name }}-namenode:9000/</value>
+        <value>hdfs://hadoop-namenode.{{ $.ObjectMeta.Namespace }}.svc.cluster.local:9000/</value>
         <description>NameNode URI</description>
       </property>
       <property>
@@ -90,18 +90,18 @@ data:
 
       <property>
         <name>mapreduce.jobhistory.address</name>
-        <value>{{ $.ObjectMeta.Name }}-resourcemanager.{{ $.ObjectMeta.Namespace }}.svc.cluster.local:10020</value>
+        <value>hadoop-historyserver.{{ $.ObjectMeta.Namespace }}.svc.cluster.local:10020</value>
       </property>
       <property>
         <name>mapreduce.jobhistory.webapp.address</name>
-        <value>{{ $.ObjectMeta.Name }}-resourcemanager.{{ $.ObjectMeta.Namespace }}.svc.cluster.local:19888</value>
+        <value>hadoop-historyserver.{{ $.ObjectMeta.Namespace }}.svc.cluster.local:19888</value>
       </property>
     </configuration>
 
   workers: |
     {{- $count := $.Spec.Hdfs.DataNode.PdbMinAvailable | int -}}
     {{- range $i, $e := until $count }}
-    {{ $.ObjectMeta.Name }}-datanode-{{ $i }}.{{ $.ObjectMeta.Name }}-datanode.{{ $.ObjectMeta.Namespace }}.svc.cluster.local
+    {{ $.ObjectMeta.Name }}-datanode-{{ $i }}.hadoop-datanode.{{ $.ObjectMeta.Namespace }}.svc.cluster.local
     {{- end }}
 
   yarn-site.xml: |
@@ -141,13 +141,13 @@ data:
 
       <property>
         <name>yarn.nodemanager.localizer.address</name>
-        <value>{{ $.ObjectMeta.Name }}-nodemanager.{{ $.ObjectMeta.Namespace }}.svc.cluster.local:8040</value>
+        <value>hadoop-nodemanager.{{ $.ObjectMeta.Namespace }}.svc.cluster.local:8040</value>
         <description>Address where the localizer IPC is.</description>
       </property>
 
       <property>
         <name>yarn.nodemanager.webapp.address</name>
-        <value>{{ $.ObjectMeta.Name }}-nodemanager.{{ $.ObjectMeta.Namespace }}.svc.cluster.local:8042</value>
+        <value>hadoop-nodemanager.{{ $.ObjectMeta.Namespace }}.svc.cluster.local:8042</value>
         <description>NodeManager Webapp address</description>
       </property>
 
@@ -176,22 +176,22 @@ data:
 
       <property>
         <name>yarn.resourcemanager.address</name>
-        <value>{{ $.ObjectMeta.Name }}-resourcemanager.{{ $.ObjectMeta.Namespace }}.svc.cluster.local:8032</value>
+        <value>hadoop-resourcemanager.{{ $.ObjectMeta.Namespace }}.svc.cluster.local:8032</value>
         <description>RM对客户端暴露的地址，客户端通过该地址向RM提交应用程序等</description>
       </property>
       <property>
         <name>yarn.resourcemanager.scheduler.address</name>
-        <value>{{ $.ObjectMeta.Name }}-resourcemanager.{{ $.ObjectMeta.Namespace }}.svc.cluster.local:8034</value>
+        <value>hadoop-resourcemanager.{{ $.ObjectMeta.Namespace }}.svc.cluster.local:8034</value>
         <description>RM对AM暴露的地址，AM通过地址想RM申请资源，释放资源等</description>
       </property>
       <property>
         <name>yarn.resourcemanager.webapp.address</name>
-        <value>{{ $.ObjectMeta.Name }}-resourcemanager.{{ $.ObjectMeta.Namespace }}.svc.cluster.local:8088</value>
+        <value>hadoop-resourcemanager.{{ $.ObjectMeta.Namespace }}.svc.cluster.local:8088</value>
         <description>resourcemanager webapp address</description>
       </property>
       <property>
         <name>yarn.resourcemanager.resource-tracker.address</name>
-        <value>{{ $.ObjectMeta.Name }}-resourcemanager.{{ $.ObjectMeta.Namespace }}.svc.cluster.local:8031</value>
+        <value>hadoop-resourcemanager.{{ $.ObjectMeta.Namespace }}.svc.cluster.local:8031</value>
         <description>RM对NM暴露地址，NM通过该地址向RM汇报心跳，领取任务等</description>
       </property>
 
@@ -338,7 +338,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ $.ObjectMeta.Name }}-datanode
+  name: hadoop-datanode
   labels:
     app: {{ $.ObjectMeta.Name }}-datanode
     chart: hadoop-1.1.4
@@ -478,7 +478,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ $.ObjectMeta.Name }}-namenode
+  name: hadoop-namenode
   labels:
     app: {{ $.ObjectMeta.Name }}-namenode
     chart: hadoop-1.1.4
@@ -614,7 +614,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ $.ObjectMeta.Name }}-resourcemanager
+  name: hadoop-resourcemanager
   labels:
     app: {{ $.ObjectMeta.Name }}-resourcemanager
     chart: hadoop-1.1.4
@@ -783,7 +783,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ $.ObjectMeta.Name }}-nodemanager
+  name: hadoop-nodemanager
   labels:
     app: {{ $.ObjectMeta.Name }}-nodemanager
     chart: hadoop-1.1.4
@@ -918,7 +918,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ $.ObjectMeta.Name }}-historyserver
+  name: hadoop-historyserver
   labels:
     app: {{ $.ObjectMeta.Name }}-historyserver
     chart: hadoop-1.1.4

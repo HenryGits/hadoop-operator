@@ -6,16 +6,19 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"flag"
 	"fmt"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"sync"
 	"syscall"
 	"time"
 )
@@ -38,6 +41,17 @@ func main() {
 	// Parse command line into the defined flags
 	flag.Parse()
 
+	fmt.Println(`
+ ██      ██          ██  ██            ██      ██                ██                          
+░██     ░██         ░██ ░██           ░██     ░██               ░██                   ██████ 
+░██     ░██  █████  ░██ ░██  ██████   ░██     ░██  ██████       ░██  ██████   ██████ ░██░░░██
+░██████████ ██░░░██ ░██ ░██ ██░░░░██  ░██████████ ░░░░░░██   ██████ ██░░░░██ ██░░░░██░██  ░██
+░██░░░░░░██░███████ ░██ ░██░██   ░██  ░██░░░░░░██  ███████  ██░░░██░██   ░██░██   ░██░██████ 
+░██     ░██░██░░░░  ░██ ░██░██   ░██  ░██     ░██ ██░░░░██ ░██  ░██░██   ░██░██   ░██░██░░░  
+░██     ░██░░██████ ███ ███░░██████   ░██     ░██░░████████░░██████░░██████ ░░██████ ░██     
+░░      ░░  ░░░░░░ ░░░ ░░░  ░░░░░░    ░░      ░░  ░░░░░░░░  ░░░░░░  ░░░░░░   ░░░░░░  ░░
+	`)
+
 	if *nnService {
 		path, _ := filepath.Abs(*nnDir)
 		// 判断NameNode是否有效
@@ -50,18 +64,14 @@ func main() {
 		// 判断NameNode是否已被初始化过
 		if len(files) <= 0 {
 			cmd := exec.CommandContext(ctx, os.ExpandEnv("$HADOOP_HOME")+"/bin/hdfs", "namenode", "-format")
-			out, err := cmd.CombinedOutput()
-			log.Info(fmt.Sprintf("===NameNode Init...=== \n%s\n", string(out)))
-
+			_, err := cmd.CombinedOutput()
 			if err != nil {
 				log.Error("NameNode初始化失败!", zap.Error(err))
 				os.Exit(1)
 			}
+			log.Info(fmt.Sprintf("=== NameNode Init Success === \n"))
 		}
-		cmd := exec.CommandContext(ctx, os.ExpandEnv("$HADOOP_HOME")+"/bin/hdfs", "--daemon", "start", "namenode")
-		out, err := cmd.CombinedOutput()
-		log.Info(fmt.Sprintf("===NameNode Service...=== \n%s\n", string(out)))
-
+		err = CommandContext(ctx, os.ExpandEnv("$HADOOP_HOME")+"/bin/hdfs", "namenode")
 		if err != nil {
 			log.Error("NameNode启动失败!", zap.Error(err))
 			os.Exit(1)
@@ -69,10 +79,7 @@ func main() {
 	}
 
 	if *dnService {
-		cmd := exec.CommandContext(ctx, os.ExpandEnv("$HADOOP_HOME")+"/bin/hdfs", "--daemon", "start", "datanode")
-		out, err := cmd.CombinedOutput()
-		log.Info(fmt.Sprintf("===DataNode Service...=== \n%s\n", string(out)))
-
+		err := CommandContext(ctx, os.ExpandEnv("$HADOOP_HOME")+"/bin/hdfs", "datanode")
 		if err != nil {
 			log.Error("DataNode启动失败!", zap.Error(err))
 			os.Exit(1)
@@ -80,10 +87,7 @@ func main() {
 	}
 
 	if *rmService {
-		cmd := exec.CommandContext(ctx, os.ExpandEnv("$HADOOP_HOME")+"/bin/yarn", "--daemon", "start", "resourcemanager")
-		out, err := cmd.CombinedOutput()
-		log.Info(fmt.Sprintf("===ResourceManager Service...=== \n%s\n", string(out)))
-
+		err := CommandContext(ctx, os.ExpandEnv("$HADOOP_HOME")+"/bin/yarn", "resourcemanager")
 		if err != nil {
 			log.Error("ResourceManager启动失败!", zap.Error(err))
 			os.Exit(1)
@@ -91,10 +95,7 @@ func main() {
 	}
 
 	if *nmService {
-		cmd := exec.CommandContext(ctx, os.ExpandEnv("$HADOOP_HOME")+"/bin/yarn", "--daemon", "start", "nodemanager")
-		out, err := cmd.CombinedOutput()
-		log.Info(fmt.Sprintf("===NodeManager Service...=== \n%s\n", string(out)))
-
+		err := CommandContext(ctx, os.ExpandEnv("$HADOOP_HOME")+"/bin/yarn", "nodemanager")
 		if err != nil {
 			log.Error("NodeManager启动失败!", zap.Error(err))
 			os.Exit(1)
@@ -102,26 +103,12 @@ func main() {
 	}
 
 	if *hsService {
-		cmd := exec.CommandContext(ctx, os.ExpandEnv("$HADOOP_HOME")+"/bin/mapred", "--daemon", "start", "historyserver")
-		out, err := cmd.CombinedOutput()
-		log.Info(fmt.Sprintf("===HistoryServer Service...=== \n%s\n", string(out)))
-
+		err := CommandContext(ctx, os.ExpandEnv("$HADOOP_HOME")+"/bin/mapred", "historyserver")
 		if err != nil {
 			log.Error("HistoryServer启动失败!", zap.Error(err))
 			os.Exit(1)
 		}
 	}
-
-	fmt.Println(`
- ██      ██          ██  ██            ██      ██                ██                          
-░██     ░██         ░██ ░██           ░██     ░██               ░██                   ██████ 
-░██     ░██  █████  ░██ ░██  ██████   ░██     ░██  ██████       ░██  ██████   ██████ ░██░░░██
-░██████████ ██░░░██ ░██ ░██ ██░░░░██  ░██████████ ░░░░░░██   ██████ ██░░░░██ ██░░░░██░██  ░██
-░██░░░░░░██░███████ ░██ ░██░██   ░██  ░██░░░░░░██  ███████  ██░░░██░██   ░██░██   ░██░██████ 
-░██     ░██░██░░░░  ░██ ░██░██   ░██  ░██     ░██ ██░░░░██ ░██  ░██░██   ░██░██   ░██░██░░░  
-░██     ░██░░██████ ███ ███░░██████   ░██     ░██░░████████░░██████░░██████ ░░██████ ░██     
-░░      ░░  ░░░░░░ ░░░ ░░░  ░░░░░░    ░░      ░░  ░░░░░░░░  ░░░░░░  ░░░░░░   ░░░░░░  ░░
-	`)
 
 	sigterm := make(chan os.Signal, 1)
 	signal.Notify(sigterm, syscall.SIGINT, syscall.SIGTERM)
@@ -131,6 +118,31 @@ func main() {
 	case <-sigterm:
 		fmt.Println("Bye: signal cancelled")
 	}
+}
+
+// CommandContext 执行shell实时输出日志
+func CommandContext(ctx context.Context, name string, cmd ...string) error {
+	c := exec.CommandContext(ctx, name, cmd...)
+	stdout, err := c.StderrPipe()
+	if err != nil {
+		return err
+	}
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func(wg *sync.WaitGroup) {
+		defer wg.Done()
+		reader := bufio.NewReader(stdout)
+		for {
+			readString, err := reader.ReadString('\n')
+			if err != nil || err == io.EOF {
+				panic(err)
+			}
+			fmt.Print(readString)
+		}
+	}(&wg)
+	err = c.Start()
+	wg.Wait()
+	return err
 }
 
 // Zap 初始日志zap

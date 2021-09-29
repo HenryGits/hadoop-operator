@@ -47,7 +47,7 @@ operator-sdk create api --group hadoop --version v1 --kind Hadoop --resource --c
 ```shell
 echo -e "
 update-codegen:
-  @./hack/update-codegen.sh " >> Makefile
+    @./hack/update-codegen.sh " >> Makefile
 ```
 1. 执行 `go get k8s.io/code-generator@v0.22.1` 下载 code-generator 到 `$GOPATH/pkg/mod/k8s.io/`
 2. 将项目拷贝到 `$GOPATH/src/github.com/HenryGits/hadoop-operator` 目录下（必须，不能将项目直接放置到 src 目录下）
