@@ -27,12 +27,13 @@ var (
 	log   *zap.Logger
 	level zapcore.Level
 
-	nnDir     = flag.String("NameNodeDir", "/usr/local/hadoop/nn", "NameNode Directory")
-	nnService = flag.Bool("NameNode", false, "是否启动NameNode服务")
-	dnService = flag.Bool("DataNode", false, "是否启动DataNode服务")
-	rmService = flag.Bool("ResourceManager", false, "是否启动ResourceManager服务")
-	nmService = flag.Bool("NodeManager", false, "是否启动NodeManager服务")
-	hsService = flag.Bool("HistoryServer", false, "是否启动HistoryServer服务")
+	nnDir       = flag.String("NameNodeDir", "/usr/local/hadoop/nn", "NameNode Directory")
+	nnService   = flag.Bool("NameNode", false, "是否启动NameNode服务")
+	dnService   = flag.Bool("DataNode", false, "是否启动DataNode服务")
+	journalNode = flag.Bool("JournalNode", false, "是否启动JournalNode服务")
+	rmService   = flag.Bool("ResourceManager", false, "是否启动ResourceManager服务")
+	nmService   = flag.Bool("NodeManager", false, "是否启动NodeManager服务")
+	hsService   = flag.Bool("HistoryServer", false, "是否启动HistoryServer服务")
 )
 
 func main() {
@@ -82,6 +83,14 @@ func main() {
 		err := CommandContext(ctx, os.ExpandEnv("$HADOOP_HOME")+"/bin/hdfs", "datanode")
 		if err != nil {
 			log.Error("DataNode启动失败!", zap.Error(err))
+			os.Exit(1)
+		}
+	}
+
+	if *journalNode {
+		err := CommandContext(ctx, os.ExpandEnv("$HADOOP_HOME")+"/bin/hdfs", "journalnode")
+		if err != nil {
+			log.Error("JournalNode启动失败!", zap.Error(err))
 			os.Exit(1)
 		}
 	}

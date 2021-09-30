@@ -32,9 +32,18 @@ spec:
         limits:
           memory: "2048Mi"
           cpu:  "1000m"
-  webHdfs:
-    enabled: true
+    # HA时启用，非必填
+    journalNode:
+      replicas: 3
+      resources:
+        requests:
+          memory: "256Mi"
+          cpu:  "100m"
+        limits:
+          memory: "2048Mi"
+          cpu:  "1000m"
   resourceManager:
+    replicas: 2
     resources:
       requests:
         memory: "256Mi"

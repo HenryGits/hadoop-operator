@@ -51,15 +51,12 @@ type HadoopSpec struct {
 	Title string `json:"title,omitempty"`
 	// Describe is the description of the hadoop release
 	// +optional
-	Describe string `json:"describe,omitempty"`
-	// +optional
+	Describe  string    `json:"describe,omitempty"`
 	Container Container `json:"container,omitempty"`
 
-	// +optional
-	Hdfs    *Hdfs    `json:"hdfs,omitempty"`
-	WebHdfs *WebHdfs `json:"webHdfs,omitempty"`
+	Hdfs *Hdfs `json:"hdfs,omitempty"`
+	//WebHdfs *WebHdfs `json:"webHdfs,omitempty"`
 	// Yarn is hadoop yarn components include ResourceManager, NodeManager
-	// +optional
 	ResourceManager *ResourceManager `json:"resourceManager,omitempty"`
 	NodeManager     *NodeManager     `json:"nodeManager,omitempty"`
 	HistoryServer   *HistoryServer   `json:"historyServer,omitempty"`
@@ -100,8 +97,9 @@ type Container struct {
 
 // Hdfs  Hadoop nn & dn
 type Hdfs struct {
-	NameNode *NameNode `json:"nameNode,omitempty"`
-	DataNode *DataNode `json:"dataNode,omitempty"`
+	NameNode    *NameNode    `json:"nameNode,omitempty"`
+	DataNode    *DataNode    `json:"dataNode,omitempty"`
+	JournalNode *JournalNode `json:"journalNode,omitempty"`
 }
 
 type NameNode struct {
@@ -131,6 +129,17 @@ type DataNode struct {
 	// 反亲和
 	// +optional
 	AntiAffinity corev1.Affinity `json:"affinity,omitempty"`
+}
+
+type JournalNode struct {
+	// +optional
+	// +kubebuilder:default=3
+	Replicas *int32 `json:"replicas,omitempty"`
+	// Resources is the CPU and memory resource (requests and limits) allocated to each Hadoop component pod.
+	// This should be tuned to fit your workload.
+	// +optional
+	// +kubebuilder:default:={requests: {cpu: "100m", memory: "256Mi"}, limits: {cpu: "500m", memory: "1Gi"}}
+	Resources Resources `json:"resources,omitempty"`
 }
 
 type WebHdfs struct {

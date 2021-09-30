@@ -26,6 +26,11 @@ data:
       </property>
     {{- end }}
       <property>
+        <name>hadoop.tmp.dir</name>
+        <value>/usr/local/hadoop</value>
+        <description>指定hadoop运行时产生文件的存储目录</description>
+      </property>
+      <property>
         <name>ha.zookeeper.quorum</name>
         <value>zookeeper-headless.system.svc.cluster.local:2181</value>
         <description>配置Zookeeper 管理HDFS</description>
@@ -35,13 +40,10 @@ data:
     <?xml version="1.0"?>
     <?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
     <configuration>
-
-    {{- if $.Spec.WebHdfs.Enabled}}
       <property>
-          <name>dfs.webhdfs.enabled</name>
-          <value>true</value>
+        <name>dfs.webhdfs.enabled</name>
+        <value>true</value>
       </property>
-    {{- end}}
 
       <property>
         <name>dfs.datanode.use.datanode.hostname</name>
@@ -65,12 +67,12 @@ data:
 
       <property>
         <name>dfs.datanode.data.dir</name>
-        <value>file:///usr/local/hadoop/dn</value>
+        <value>file://${hadoop.tmp.dir}/dn</value>
       </property>
 
       <property>
         <name>dfs.namenode.name.dir</name>
-        <value>file:///usr/local/hadoop/nn</value>
+        <value>file://${hadoop.tmp.dir}/nn</value>
       </property>
 
       <property>
@@ -78,7 +80,6 @@ data:
         <value>false</value>
       </property>
 
-      <!-- Bind to all interfaces -->
       <property>
         <name>dfs.namenode.rpc-bind-host</name>
         <value>0.0.0.0</value>
@@ -88,7 +89,6 @@ data:
         <name>dfs.namenode.servicerpc-bind-host</name>
         <value>0.0.0.0</value>
       </property>
-      <!-- /Bind to all interfaces -->
 
     {{- $count := $.Spec.Hdfs.NameNode.Replicas | int -}}
     {{- if gt $count 1}}
@@ -99,43 +99,55 @@ data:
 
       <property>
         <name>dfs.ha.namenodes.nameservice1</name>
-        <value>{{- range $i := until (int (.Spec.Hdfs.NameNode.Replicas)) -}}hadoop-namenode-{{ $i }}.{{ $.ObjectMeta.Namespace }}.svc.cluster.local{{- if  lt $i (sub $count 1)  -}},{{- end -}}{{- end -}}</value>
+        <value>{{- range $i := until (int (.Spec.Hdfs.NameNode.Replicas)) -}}{{ $.ObjectMeta.Name }}-namenode-{{ $i }}{{- if  lt $i (sub $count 1)  -}},{{- end -}}{{- end -}}</value>
       </property>
 
     {{- range $i := until (int (.Spec.Hdfs.NameNode.Replicas)) }}
        <property>
-         <name>dfs.namenode.rpc-address.nameservice1.hadoop-namenode-{{ $i }}</name>
+         <name>dfs.namenode.rpc-address.nameservice1.{{ $.ObjectMeta.Name }}-namenode-{{ $i }}</name>
          <value>hadoop-namenode-{{ $i }}.{{ $.ObjectMeta.Namespace }}.svc.cluster.local:9000</value>
        </property>
        <property>
-         <name>dfs.namenode.http-address.nameservice1.hadoop-namenode-{{ $i }}</name>
+         <name>dfs.namenode.http-address.nameservice1.{{ $.ObjectMeta.Name }}-namenode-{{ $i }}</name>
          <value>hadoop-namenode-{{ $i }}.{{ $.ObjectMeta.Namespace }}.svc.cluster.local:9870</value>
        </property>
      {{- end }}
 
-        <!-- 指定NameNode的元数据在JournalNode上的存放位置 -->
        <property>
-         <name>dfs.namenode.shared.edits.dir</name>
-         <value>qjournal://{{- range $i := until (int (.Spec.Hdfs.NameNode.Replicas)) -}}hadoop-namenode-{{ $i }}.{{ $.ObjectMeta.Namespace }}.svc.cluster.local:8485{{- if  lt $i (sub $count 1)  -}};{{- end -}}{{- end -}}/nameservice1</value>
+        <name>dfs.namenode.shared.edits.dir</name>
+        <value>qjournal://hadoop-journalnode.{{ $.ObjectMeta.Namespace }}.svc.cluster.local:8485/nameservice1</value>
+        <description>指定NameNode的元数据在JournalNode上的存放位置</description>
        </property>
 
-       <!-- 指定JournalNode在本地磁盘存放数据的位置 -->
        <property>
-         <name>dfs.journalnode.edits.dir</name>
-         <value>/usr/local/hadoop/journalData</value>
+        <name>dfs.journalnode.edits.dir</name>
+        <value>${hadoop.tmp.dir}/jn</value>
+        <description>指定JournalNode在本地磁盘存放数据的位置</description>
        </property>
 
-       <!-- 开启NameNode失败自动切换 -->
        <property>
          <name>dfs.ha.automatic-failover.enabled</name>
          <value>true</value>
+         <description>开启NameNode失败自动切换</description>
        </property>
 
-       <!-- 配置失败自动切换实现方式 -->
        <property>
-         <name>dfs.client.failover.proxy.provider.nameservice1</name>
-         <value>org.apache.hadoop.hdfs.server.namenode.ha.ConfiguredFailoverProxyProvider</value>
+        <name>dfs.client.failover.proxy.provider.nameservice1</name>
+        <value>org.apache.hadoop.hdfs.server.namenode.ha.ConfiguredFailoverProxyProvider</value>
+        <description>配置失败自动切换实现方式</description>
        </property>
+
+      <property>
+        <name>dfs.ha.fencing.methods</name>
+        <value>sshfence</value>
+        <description>配置隔离机制，即同一时刻只能有一台服务器对外响应</description>
+      </property>
+
+      <property>
+        <name>dfs.ha.fencing.ssh.private-key-files</name>
+        <value>~/.ssh/id_rsa</value>
+        <description> 配置隔离机制，即同一时刻只能有一台服务器对外响应</description>
+      </property>
     {{- end}}
     </configuration>
 
@@ -175,7 +187,6 @@ data:
         <value>{{ $.ObjectMeta.Name }}-resourcemanager-0</value>
       </property>
 
-      <!-- Bind to all interfaces -->
       <property>
         <name>yarn.resourcemanager.bind-host</name>
         <value>0.0.0.0</value>
@@ -188,7 +199,6 @@ data:
         <name>yarn.timeline-service.bind-host</name>
         <value>0.0.0.0</value>
       </property>
-      <!-- /Bind to all interfaces -->
 
       <property>
         <name>yarn.nodemanager.vmem-check-enabled</name>
@@ -198,6 +208,12 @@ data:
       <property>
         <name>yarn.nodemanager.aux-services</name>
         <value>mapreduce_shuffle</value>
+      </property>
+
+      <property>
+        <name>yarn.resourcemanager.recovery.enabled</name>
+        <value>true</value>
+        <description>启用自动恢复</description>
       </property>
 
       <property>
@@ -235,26 +251,69 @@ data:
         <value>/var/log/hadoop-yarn/apps</value>
       </property>
 
+    {{- $count := $.Spec.ResourceManager.Replicas | int -}}
+    {{- if gt $count 1}}
       <property>
-        <name>yarn.resourcemanager.address</name>
-        <value>hadoop-resourcemanager.{{ $.ObjectMeta.Namespace }}.svc.cluster.local:8032</value>
-        <description>RM对客户端暴露的地址，客户端通过该地址向RM提交应用程序等</description>
+        <name>yarn.resourcemanager.ha.enabled</name>
+        <value>true</value>
+        <description>启用ResourceManager HA</description>
+      </property>
+
+      <property>
+        <name>yarn.resourcemanager.cluster-id</name>
+        <value>cluster-yarn</value>
+        <description>声明三台resourcemanager的地址</description>
       </property>
       <property>
-        <name>yarn.resourcemanager.scheduler.address</name>
-        <value>hadoop-resourcemanager.{{ $.ObjectMeta.Namespace }}.svc.cluster.local:8034</value>
-        <description>RM对AM暴露的地址，AM通过地址想RM申请资源，释放资源等</description>
+        <name>yarn.resourcemanager.ha.rm-ids</name>
+        <value>{{- range $i := until (int ($count)) -}}rm-{{ $i }}{{- if  lt $i (sub $count 1)  -}},{{- end -}}{{- end -}}</value>
+        <description>指定resourcemanager的逻辑列表</description>
+      </property>
+
+    {{- range $i := until (int ($count)) }}
+      <property>
+        <name>yarn.resourcemanager.hostname.rm-{{ $i }}</name>
+        <value>hadoop-resourcemanager-{{ $i }}.{{ $.ObjectMeta.Namespace }}.svc.cluster.local</value>
       </property>
       <property>
-        <name>yarn.resourcemanager.webapp.address</name>
-        <value>hadoop-resourcemanager.{{ $.ObjectMeta.Namespace }}.svc.cluster.local:8088</value>
-        <description>resourcemanager webapp address</description>
+        <name>yarn.resourcemanager.scheduler.address.rm-{{ $i }}</name>
+        <value>hadoop-resourcemanager-{{ $i }}.{{ $.ObjectMeta.Namespace }}.svc.cluster.local:8030</value>
       </property>
       <property>
-        <name>yarn.resourcemanager.resource-tracker.address</name>
-        <value>hadoop-resourcemanager.{{ $.ObjectMeta.Namespace }}.svc.cluster.local:8031</value>
-        <description>RM对NM暴露地址，NM通过该地址向RM汇报心跳，领取任务等</description>
+        <name>yarn.resourcemanager.resource-tracker.address.rm-{{ $i }}</name>
+        <value>hadoop-resourcemanager-{{ $i }}.{{ $.ObjectMeta.Namespace }}.svc.cluster.local:8031</value>
       </property>
+      <property>
+        <name>yarn.resourcemanager.address.rm-{{ $i }}</name>
+        <value>hadoop-resourcemanager-{{ $i }}.{{ $.ObjectMeta.Namespace }}.svc.cluster.local:8032</value>
+      </property>
+      <property>
+        <name>yarn.resourcemanager.webapp.address.rm-{{ $i }}</name>
+        <value>hadoop-resourcemanager-{{ $i }}.{{ $.ObjectMeta.Namespace }}.svc.cluster.local:8088</value>
+      </property>
+    {{- end }}
+    {{- else }}
+      <property>
+       <name>yarn.resourcemanager.scheduler.address</name>
+       <value>hadoop-resourcemanager.{{ $.ObjectMeta.Namespace }}.svc.cluster.local:8030</value>
+       <description>RM对AM暴露的地址，AM通过地址想RM申请资源，释放资源等</description>
+      </property>
+      <property>
+       <name>yarn.resourcemanager.resource-tracker.address</name>
+       <value>hadoop-resourcemanager.{{ $.ObjectMeta.Namespace }}.svc.cluster.local:8031</value>
+       <description>RM对NM暴露地址，NM通过该地址向RM汇报心跳，领取任务等</description>
+      </property>
+      <property>
+       <name>yarn.resourcemanager.address</name>
+       <value>hadoop-resourcemanager.{{ $.ObjectMeta.Namespace }}.svc.cluster.local:8032</value>
+       <description>RM对客户端暴露的地址，客户端通过该地址向RM提交应用程序等</description>
+      </property>
+      <property>
+       <name>yarn.resourcemanager.webapp.address</name>
+       <value>hadoop-resourcemanager.{{ $.ObjectMeta.Namespace }}.svc.cluster.local:8088</value>
+       <description>RM web端地址</description>
+      </property>
+    {{- end}}
 
       <property>
         <name>yarn.resourcemanager.zk.state-store.address</name>
@@ -270,7 +329,6 @@ data:
         <value>org.apache.hadoop.yarn.server.resourcemanager.recovery.ZKRMStateStore</value>
         <description>指定resourcemanager的状态信息存储在zookeeper集群，默认是存放在FileSystem里面</description>
       </property>
-
 
       <property>
         <name>yarn.application.classpath</name>
@@ -536,7 +594,7 @@ spec:
 
 
 {{- $count := $.Spec.Hdfs.NameNode.Replicas | int -}}
-{{- range $i := until (int (.Spec.Hdfs.NameNode.Replicas)) }}
+{{- range $i := until (int ($count)) }}
 ---
 apiVersion: v1
 kind: Service
@@ -674,14 +732,20 @@ spec:
       app: {{ $.ObjectMeta.Name }}-resourcemanager
       release: {{ $.ObjectMeta.Name }}-resourcemanager
       component: {{ $.ObjectMeta.Name }}-resourcemanager
-  maxUnavailable: 1
+  minAvailable: 1
 
 
+{{- $count := $.Spec.ResourceManager.Replicas | int -}}
+{{- range $i := until (int ($count)) }}
 ---
 apiVersion: v1
 kind: Service
 metadata:
+  {{- if gt $count 1 }}
+  name: hadoop-resourcemanager-{{ $i }}
+  {{- else }}
   name: hadoop-resourcemanager
+  {{- end }}
   labels:
     app: {{ $.ObjectMeta.Name }}-resourcemanager
     chart: hadoop-1.1.4
@@ -697,14 +761,14 @@ spec:
       name: tracker
     - port: 8032
       name: rm-client
-    - port: 8034
+    - port: 8030
       name: scheduler
 #  clusterIP: None
   selector:
     app: {{ $.ObjectMeta.Name }}-resourcemanager
     release: {{ $.ObjectMeta.Name }}-resourcemanager
     component: {{ $.ObjectMeta.Name }}-resourcemanager
-
+{{- end }}
 
 
 
@@ -1003,3 +1067,122 @@ spec:
     app: {{ $.ObjectMeta.Name }}-historyserver
     release: {{ $.ObjectMeta.Name }}-historyserver
     component: {{ $.ObjectMeta.Name }}-historyserver
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ $.ObjectMeta.Name }}-journalnode
+  labels:
+    app: {{ $.ObjectMeta.Name }}-journalnode
+    chart: hadoop-1.1.4
+    release: {{ $.ObjectMeta.Name }}-journalnode
+    component: {{ $.ObjectMeta.Name }}-journalnode
+    operator.dameng.com/id: {{ $.Spec.ID | quote }}
+  annotations:
+    operator.dameng.com/title: {{ $.Spec.Title | hexenc | quote }}
+spec:
+  serviceName: {{ $.ObjectMeta.Name }}-journalnode
+  replicas: {{ $.Spec.Hdfs.JournalNode.Replicas }}
+  selector:
+    matchLabels:
+      app: {{ $.ObjectMeta.Name }}-journalnode
+      release: {{ $.ObjectMeta.Name }}-journalnode
+      component: {{ $.ObjectMeta.Name }}-journalnode
+  template:
+    metadata:
+      labels:
+        app: {{ $.ObjectMeta.Name }}-journalnode
+        release: {{ $.ObjectMeta.Name }}-journalnode
+        component: {{ $.ObjectMeta.Name }}-journalnode
+        operator.dameng.com/id: {{ $.Spec.ID | quote }}
+        sidecar.istio.io/inject: "false"
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - topologyKey: "kubernetes.io/hostname"
+              labelSelector:
+                matchLabels:
+                  app: {{ $.ObjectMeta.Name }}-journalnode
+                  release: {{ $.ObjectMeta.Name }}-journalnode
+                  component: {{ $.ObjectMeta.Name }}-journalnode
+      terminationGracePeriodSeconds: 0
+      containers:
+        - name: {{ $.ObjectMeta.Name }}-journalnode
+          image: "{{ $.Spec.Container.Image }}"
+          imagePullPolicy: {{ $.Spec.Container.PullPolicy | quote }}
+          ports:
+            - containerPort: 8485
+              name: journalnode
+          args:
+            - "--JournalNode"
+          securityContext:
+            privileged: true
+{{ parseResources $.Spec.Hdfs.JournalNode.Resources | indent 10 }}
+          volumeMounts:
+            - name: hadoop-config
+              mountPath: /usr/local/hadoop/etc/hadoop/core-site.xml
+              subPath: core-site.xml
+            - name: hadoop-config
+              mountPath: /usr/local/hadoop/etc/hadoop/hdfs-site.xml
+              subPath: hdfs-site.xml
+            - name: hadoop-config
+              mountPath: /usr/local/hadoop/etc/hadoop/mapred-site.xml
+              subPath: mapred-site.xml
+            - name: hadoop-config
+              mountPath: /usr/local/hadoop/etc/hadoop/workers
+              subPath: workers
+            - name: hadoop-config
+              mountPath: /usr/local/hadoop/etc/hadoop/yarn-site.xml
+              subPath: yarn-site.xml
+            - name: jn
+              mountPath: /usr/local/hadoop/jn
+      volumes:
+        - name: hadoop-config
+          configMap:
+            name: {{ $.ObjectMeta.Name }}
+        - name: jn
+          hostPath:
+            path: /home/data/jn
+            type: DirectoryOrCreate
+
+---
+apiVersion: policy/v1beta1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $.ObjectMeta.Name }}-journalnode
+  labels:
+    app: {{ $.ObjectMeta.Name }}-journalnode
+    chart: hadoop-1.1.4
+    release: {{ $.ObjectMeta.Name }}-journalnode
+    component: {{ $.ObjectMeta.Name }}-journalnode
+    operator.dameng.com/id: {{ $.Spec.ID | quote }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ $.ObjectMeta.Name }}-journalnode
+      release: {{ $.ObjectMeta.Name }}-journalnode
+      component: {{ $.ObjectMeta.Name }}-journalnode
+  minAvailable: 3
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hadoop-journalnode
+  labels:
+    app: {{ $.ObjectMeta.Name }}-journalnode
+    chart: hadoop-1.1.4
+    release: {{ $.ObjectMeta.Name }}-journalnode
+    component: {{ $.ObjectMeta.Name }}-journalnode
+    operator.dameng.com/id: {{ $.Spec.ID | quote }}
+spec:
+  ports:
+    - port: 8485
+      name: journalnode
+  clusterIP: None
+  selector:
+    app: {{ $.ObjectMeta.Name }}-journalnode
+    release: {{ $.ObjectMeta.Name }}-journalnode
+    component: {{ $.ObjectMeta.Name }}-journalnode
